@@ -1,6 +1,6 @@
 import pandas as pd
 
-def cleanup(baseline, data, tolerance):
+def cleanup(baseline, data):
     baseline = pd.read_csv(baseline, header=None)
     test = pd.read_csv(data, header=None)
 

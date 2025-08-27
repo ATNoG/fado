@@ -82,7 +82,6 @@ def main():
             window_size = args.window_size,
             baseline = args.baseline,
             filename = args.filename,
-            tolerance = args.tolerance
         )
         if not (args.train or args.test):
             exit()

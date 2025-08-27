@@ -6,8 +6,8 @@ import os
 # Read CSV (replace with your actual path)
 filename = sys.argv[1]
 df = pd.read_csv(f"{filename}.csv")
-db = os.path.join(os.curdir, "data/figs")
-output = os.path.join(db, filename) + ".pdf"
+filename = os.path.basename(filename)
+output = os.path.join("data/figs", filename) + ".pdf"
 
 # Extract X axis from the first column
 x_values = df.iloc[:, 0]

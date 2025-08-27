@@ -87,7 +87,6 @@ def simulate(
         window_size=3,
         baseline:str=None,
         filename:str=None,
-        tolerance:float=0.6
         ):
     
     if not (duration or limit): 
@@ -103,31 +102,31 @@ def simulate(
 
     data_path = os.path.join(DB, f"{filename}_{scenario.syscallDir}" if filename else scenario.syscallDir) + f"_w{window_size}.csv"
 
-    stop_sim = Event() 
-    exploit_flag = Event()
+    # stop_sim = Event() 
+    # exploit_flag = Event()
 
-    if not exploit:
-        exploit_flag.set()
-    else:
-        exploit_thread = Process(target=gen_exploit, args=(scenario, stop_sim, exploit_flag))
-        exploit_thread.start()
+    # if not exploit:
+    #     exploit_flag.set()
+    # else:
+    #     exploit_thread = Process(target=gen_exploit, args=(scenario, stop_sim, exploit_flag))
+    #     exploit_thread.start()
 
-    probe_thread = Process(target=monitor_data, args=(data_path, stop_sim, exploit_flag, mntns, window_size, limit))
-    probe_thread.start()
+    # probe_thread = Process(target=monitor_data, args=(data_path, stop_sim, exploit_flag, mntns, window_size, limit))
+    # probe_thread.start()
     
-    scenario.simulate(duration, stop_sim, exploit=exploit)
-    if not stop_sim.is_set():
-        stop_sim.set()
+    # scenario.simulate(duration, stop_sim, exploit=exploit)
+    # if not stop_sim.is_set():
+    #     stop_sim.set()
     
-    probe_thread.join()
+    # probe_thread.join()
 
     if exploit:
-        exploit_thread.join()
+        # exploit_thread.join()
 
         if baseline != None:
             baseline += ".csv"
             baseline = os.path.join(DB, baseline)
-            cleanup(baseline, data_path, tolerance)
+            cleanup(baseline, data_path)
 
 
         
