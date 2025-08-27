@@ -1,0 +1,9 @@
+pandas
+tqdm
+hmmlearn
+matplotlib
+requests
+aiohttp
+seaborn
+psutil
+objgraph
