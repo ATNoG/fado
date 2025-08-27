@@ -123,7 +123,7 @@ sudo venv/bin/python3 -m src.main -m hmm -tol 0.5
 |   ├── figs/               # Plots, figures
 |   ├── files/              # Saved models
 |   ├── logs/               # Generated data
-|   ├── stats/              # Model statistics
+|   └── stats/              # Model statistics
 ├── models/
 │   ├── __init__.py
 │   └── hmm.py              # Classification model (train/test routines)
