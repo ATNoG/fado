@@ -1,5 +1,6 @@
+import csv
 from utils import BaseSimulation, Scenario, ScenarioManager
-from probe import Probe
+from probe import Probe, SysdigProbe
 from multiprocessing import Lock, Process, Event
 from .cleanup_data import cleanup
 import os
@@ -46,6 +47,93 @@ def monitor_data(
             return
         sleep(0.5)
 
+
+def sysdig_monitor(
+        data_path: str,
+        stop_sim,          # threading.Event
+        exploit_flag,      # threading.Event
+        mntns: str,        # here: container_id or unique prefix for SysdigProbe
+        window_size: int,  # unused (kept for signature compatibility)
+        limit: int
+    ):
+    """
+    Stream raw sysdig events to CSV as they are traced (no sliding window).
+
+    CSV columns (no header):
+      ts, container_id, container_name, pid, tid, evt_type, evt_args, 0
+    """
+
+    # Treat mntns as the target container ID/prefix for SysdigProbe
+    container_id = mntns
+
+    # Start probe (this SysdigProbe version already filters on container_id and ignores futex)
+    probe = SysdigProbe(container_id=container_id)
+
+    # Open output file (line-buffered via newline='' + csv.writer)
+    writer = open(data_path, "w", newline="")
+    # writer = csv.writer(f)
+
+    counter = 0  # number of events written
+
+    def write_batch(events):
+        nonlocal counter
+        if not events:
+            return 0
+        written = 0
+        # If limit is set, only write up to the remaining budget
+        remaining = (limit - counter) if limit else None
+        for e in (events if remaining is None else events[:max(0, remaining)]):
+            writer.write(e + "\n")
+            # ts, cid, cname, pid, tid, evtype, evargs = e
+            # writer.writerow([ts, cid, cname, pid, tid, evtype, evargs, 0])
+            written += 1
+        counter += written
+        return written
+
+    probe.start()
+    try:
+        while True:
+            # Stop conditions
+            if stop_sim.is_set() or (limit and counter >= limit):
+                if not stop_sim.is_set():
+                    stop_sim.set()
+
+                # Wait for exploit to finish (matches your original behavior)
+                while not exploit_flag.is_set():
+                    sleep(0.2)
+
+                # Stop probe and flush remaining events (respect limit)
+                remaining_events = probe.stop()
+
+                if limit and counter < limit:
+                    # write only up to limit
+                    write_batch(remaining_events)
+                elif not limit:
+                    write_batch(remaining_events)
+
+                if limit > 0 and counter > limit:
+                    print(f"Limit exceeded by {counter - limit} events")
+
+                print("Ending trace")
+                writer.close()
+                return
+
+            # Normal streaming: get current events and write them
+            batch = probe.get_data()
+            write_batch(batch)
+
+            sleep(0.5)
+    finally:
+        # Best-effort cleanup if something goes wrong
+        try:
+            probe.stop()
+        except Exception:
+            pass
+        try:
+            writer.close()
+        except Exception:
+            pass
+
 def gen_exploit(scenario:BaseSimulation, stop_sim, exploit_flag):
     """
     Occasionally trigger exploits while simulation is running.
@@ -55,17 +143,18 @@ def gen_exploit(scenario:BaseSimulation, stop_sim, exploit_flag):
     lock = Lock()
     counter = 0 
 
-    chance = 0.005
+    chance = 0.01
 
     while not stop_sim.is_set():  # keep going until stop signal
         # Random chance to fire exploit
         if random() < chance:
             with lock:
+                print("Exploiting")
                 scenario.call_exploit()
             exploit_flag.set()
             counter += 1
             chance /= 10
-        sleep(2)  # control loop frequency (every 200ms)
+        sleep(0.5)  # control loop frequency (every 2000ms)
 
     # Guarantee at least one exploit before stopping
     if not exploit_flag.is_set():
@@ -100,28 +189,32 @@ def simulate(
           f"Simulating {scenario.name}, with {"exploit " if exploit else "no exploit "}{f"for {duration} seconds " if duration else ""}{f"until {limit} syscalls" if limit else ""}\n" +
           "*" * 116 + "\n")
 
-    data_path = os.path.join(DB, f"{filename}_{scenario.syscallDir}" if filename else scenario.syscallDir) + f"_w{window_size}.csv"
+    data_path = os.path.join(DB, filename.removesuffix(".csv") if filename else scenario.syscallDir + f"_w{window_size}") + ".csv"
 
-    # stop_sim = Event() 
-    # exploit_flag = Event()
+    stop_sim = Event() 
+    exploit_flag = Event()
 
-    # if not exploit:
-    #     exploit_flag.set()
-    # else:
-    #     exploit_thread = Process(target=gen_exploit, args=(scenario, stop_sim, exploit_flag))
-    #     exploit_thread.start()
+    if not exploit:
+        exploit_flag.set()
+    else:
+        exploit_thread = Process(target=gen_exploit, args=(scenario, stop_sim, exploit_flag))
+        exploit_thread.start()
 
-    # probe_thread = Process(target=monitor_data, args=(data_path, stop_sim, exploit_flag, mntns, window_size, limit))
-    # probe_thread.start()
+
+    if mntns == "/sys/fs/bpf/mnt_ns_set":
+        probe_thread = Process(target=monitor_data, args=(data_path, stop_sim, exploit_flag, mntns, window_size, limit))
+    else:
+        probe_thread = Process(target=sysdig_monitor, args=(data_path, stop_sim, exploit_flag, mntns, window_size, limit))
+    probe_thread.start()
     
-    # scenario.simulate(duration, stop_sim, exploit=exploit)
-    # if not stop_sim.is_set():
-    #     stop_sim.set()
+    scenario.simulate(duration, stop_sim, exploit=exploit)
+    if not stop_sim.is_set():
+        stop_sim.set()
     
-    # probe_thread.join()
+    probe_thread.join()
 
     if exploit:
-        # exploit_thread.join()
+        exploit_thread.join()
 
         if baseline != None:
             baseline += ".csv"

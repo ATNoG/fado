@@ -5,6 +5,7 @@ from hmmlearn.base import ConvergenceMonitor
 import pandas as pd
 import pickle
 import numpy as np
+from collections import defaultdict
 import os
 from collections import deque
 from time import time_ns, time
@@ -48,6 +49,7 @@ class HMM:
         self.threshold = 0
         self.window_size = None
         self.name = model_file
+        self.stide = set()
 
         if os.path.exists(self.model_file):
             print("Loading Model...")
@@ -62,15 +64,46 @@ class HMM:
             self.model.monitor_ = EarlyStop(self.model.n_iter, 0.1, 5, True)
 
     def train(self, train_data):
-        train_data = os.path.join(DB, train_data) + ".csv"
+        seq_counter = defaultdict(int)
+        train_data = os.path.join(DB, train_data.removesuffix(".csv")) + ".csv"
         train_data = pd.read_csv(train_data, header=None)
         train_data.drop(train_data.columns[-1], axis=1, inplace=True)
         self.window_size = train_data.shape[1]
 
-        train_data = train_data.to_numpy()
-        X = train_data.flatten().reshape(-1,1)
-        lengths = [self.window_size] * len(train_data)
+            # Numpy array (ensure contiguous)
+        arr = np.ascontiguousarray(train_data.to_numpy())
+        n_rows = arr.shape[0]
+        if n_rows == 0:
+            # Nothing to do
+            return np.empty((0, 1)), self.window_size
 
+        # ---- Count identical sequences efficiently ----
+        # Structured view: treat each row as a single item for hashing/unique
+        row_dtype = np.dtype([('f'+str(i), arr.dtype) for i in range(arr.shape[1])])
+        structured = arr.view(row_dtype).ravel()
+
+        # Unique rows + counts
+        uniq_rows, counts = np.unique(structured, return_counts=True)
+        freqs = counts / n_rows
+
+        # Identify frequent sequences (> threshold)
+        frequent_mask = freqs > 0.1
+        frequent_structs = uniq_rows[frequent_mask]
+
+        # Update STIDE set (store as tuples for readability/interoperability)
+        # NOTE: `stide` is assumed to be a mutable set-like (e.g., set()).
+        if len(frequent_structs):
+            # Convert structured back to tuples only for the frequent ones (small)
+            frequent_arr = frequent_structs.view(arr.dtype).reshape(-1, arr.shape[1])
+            for row in frequent_arr:
+                self.stide.add(tuple(row.tolist()))
+
+        # ---- Filter out frequent sequences in one vectorized shot ----
+        to_drop_mask = np.isin(structured, frequent_structs, assume_unique=False)
+        filtered = arr[~to_drop_mask]
+        print(len(filtered))
+        X = filtered.reshape(-1, 1)
+        lengths = [self.window_size] * len(filtered)
         stime = time()
         self.model.fit(X, lengths=lengths)
         train_time = (time() - stime) // 60
@@ -78,7 +111,8 @@ class HMM:
 
         predictions = []
         avg = 0
-        for sequence in tqdm(train_data):
+
+        for sequence in tqdm(filtered):
             seq = np.array(sequence).reshape(-1,1)
             stime = time_ns()
             prediction = self.model.score(seq, [self.window_size])
@@ -88,6 +122,9 @@ class HMM:
         self.threshold = min(predictions)
         avg_pred_time = (avg / len(train_data)) / 1e6
         print(f"\nAvg prediction time: {(avg_pred_time):.3f}ms")
+
+            
+
 
         with open(os.path.join(STATS, f"{self.name}_train.txt"), 'w') as stats:
             stats.write(
@@ -100,7 +137,7 @@ class HMM:
             )
 
         with open(self.model_file, 'wb') as f:
-            pickle.dump({'model': self.model, 'threshold': self.threshold, 'window_size': self.window_size}, f)
+            pickle.dump({'model': self.model, 'threshold': self.threshold, 'window_size': self.window_size, 'stide': self.stide}, f)
 
     def test(self, test_data, tolerance=0.6):
         test_data = os.path.join(DB, test_data) + ".csv"
@@ -118,11 +155,28 @@ class HMM:
         tolerant_prediction_flags = []
 
         for flag, sequence in enumerate(tqdm(Y)):
+            tolerant_flags.append(flags[flag])
+            if str(sequence.tolist()) in self.stide:
+                scores.append(0)
+                predictions.append(0)
+                tolerant_queue.append(0)
+                if sum(tolerant_flags) > (len(tolerant_queue) * tolerance):
+                    tolerant_prediction_flags.append(1)
+                else:
+                    tolerant_prediction_flags.append(0)
+
+
+                if sum(tolerant_queue) > (len(tolerant_queue) * tolerance):
+                    tolerant_predictions.append(1)
+                else:
+                    tolerant_predictions.append(0)
+                continue
+
             seq = np.array(sequence).reshape(-1,1)
             stime = time_ns()
             score = self.model.score(seq, [self.window_size])
             avg += time_ns() - stime
-            tolerant_flags.append(flags[flag])
+            # tolerant_flags.append(flags[flag])
 
             if np.isneginf(score):
                 scores.append(self.threshold - 100)
@@ -170,27 +224,7 @@ class HMM:
         cm = confusion_matrix(flags, predictions)
         print(cm)
 
-        # new_pred = []
-        # new_flags = []
-        # n = len(predictions)
-        # interval = 10
-        # tolerance = 6
-        # print(f"Tolerance = {tolerance}/{interval}")
-        # for i in range(n-interval-1):
-        #     window = predictions[i:i+interval]
-        #     flag_window = flags[i:i+interval]
-        #     if sum(flag_window) >= 1:
-        #         new_flags.append(1)
-        #     else:
-        #         new_flags.append(0)
-
-        #     if sum(window) >= tolerance:
-        #         new_pred.append(1)
-        #     else:
-        #         new_pred.append(0)
-
         print("\nTolerant Confusion Matrix:")
-        # tcm = confusion_matrix(new_flags, new_pred)
         tcm = confusion_matrix(tolerant_prediction_flags, tolerant_predictions)
         print(tcm)
 
@@ -219,7 +253,7 @@ class HMM:
                     cmap='YlGnBu',
                     norm=LogNorm(vmin=vmin, vmax=vmax),
                     cbar=True,
-                    xticklabels=['0', '1'],
+                    xticklabels=['Normal', 'Anomalous'],
                     yticklabels=['Normal', 'Anomalous'])
 
         # Axis labels and title

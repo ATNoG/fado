@@ -29,6 +29,8 @@ At runtime, the tracing logic will filter syscalls so that **only the ones match
 
 ### Setup Instructions
 
+> Launch the container to be traced prior to this setup
+
 ```
 sudo bpftool map create /sys/fs/bpf/mnt_ns_set type hash key 8 value 4 entries 128 \
         name mnt_ns_set flags 0
@@ -57,7 +59,7 @@ To check the entries already in the map
 ## Execution Flow
 
 1. **Simulation Mode (`--simulation`)**  
-   Runs a scenario-based container simulation.  
+   Runs a scenario-based container simulation. 
    - Executes exploit if `--exploit` is set.  
    - Applies sliding-window tracing (`--window_size`).  
    - Saves output under `--filename` if provided.  

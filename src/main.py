@@ -9,8 +9,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("-sc", "--scenario",
         help="""Scenario to use:
-            0 → sentiment_analyzer
-            1 → yaml_load
+            0 → yaml_load
+            1 → sentiment_analyzer
             2 → log4jpwn
         """,
         type=int)

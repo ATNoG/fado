@@ -29,7 +29,6 @@ export default function YamlUploader() {
 
       const result = await response.text(); // always read as text
       if (!response.ok) throw new Error(result);
-      if (result == "Anomalous") throw new Error("Anomalous Behavior Detected");
 
       setStatus("✅ Upload successful");
       setFileContent(result);
@@ -42,7 +41,7 @@ export default function YamlUploader() {
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
       <div className="bg-white shadow-xl rounded-2xl p-6 w-full max-w-xl space-y-4">
-        <h1 className="text-2xl font-semibold text-gray-800">YAML File Uploader</h1>
+        <h1 className="text-2xl font-semibold text-gray-800">File Uploader</h1>
 
         <input
           type="file"

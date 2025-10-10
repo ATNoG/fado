@@ -44,8 +44,6 @@ def index(email):
     try:
         for k, v in files.items():
             yaml_content = yaml.unsafe_load(BytesIO(v[0]))
-            if anomaly_detected():
-                return "Anomalous"
             return str(yaml_content)
     except Exception as e:
         return {"error": str(e)}
