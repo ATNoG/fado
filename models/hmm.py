@@ -144,9 +144,7 @@ class HMM:
         predictions = []
         avg = 0
 
-        train_data = train_data.to_numpy()
-
-        for sequence in tqdm(train_data):
+        for sequence in tqdm(filtered):
             if tuple(sequence) in self.whitelist:
                 continue
             seq = np.array(sequence).reshape(-1,1)
@@ -156,6 +154,7 @@ class HMM:
             predictions.append(prediction)
 
         self.threshold = min(predictions)
+        print(f"Threshold: {self.threshold}")
         avg_pred_time = (avg / len(train_data)) / 1e6
         print(f"\nAvg prediction time: {(avg_pred_time):.3f}ms")
 
