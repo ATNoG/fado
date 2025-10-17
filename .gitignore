@@ -63,3 +63,9 @@ static/
 *.yaml
 ignore/
 *.env
+
+*.pkl
+*.csv
+*.log
+*.pdf
+*.txt

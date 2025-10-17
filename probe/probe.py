@@ -46,13 +46,13 @@ class ContainerFilter:
         self.cgroupmap = None
 
 class  Probe:
-    def __init__(self, mntnsmap, window_size=3):
+    def __init__(self, mntnsmap):
         self.htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',
         b'map_lookup_and_delete_batch') == 1 else False
         args = ContainerFilter(mntnsmap)
         bpf = filter_by_containers(args) + bpf_program
         self.bpf = BPF(text=bpf)
-        self.window_size = window_size
+        # self.window_size = window_size
         self.data_lock = threading.Lock()
         self.data = []
         self.monitor_dict = threading.Thread(target=self.monitor, daemon=True)
@@ -77,15 +77,15 @@ class  Probe:
         self.bpf.detach_tracepoint("raw_syscalls:sys_exit")
         return data
 
-    def gen_sliding_window(self, data):
+    def gen_sliding_window(self, data, window_size):
         grouped = defaultdict(list)
         for ts, tid, sid in data:
             grouped[tid].append(sid)
         threads = {}
         for tid, syscalls in grouped.items():
             grouped_syscalls = [
-                syscalls[i:i + self.window_size]
-                for i in range(0, len(syscalls) - self.window_size + 1)
+                syscalls[i:i + window_size]
+                for i in range(0, len(syscalls) - window_size + 1)
             ]
             threads[tid] = grouped_syscalls
         grouped.clear()

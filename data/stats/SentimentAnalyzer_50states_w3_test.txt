@@ -1,4 +1,4 @@
-Avg Prediction Time: 0.6264148643039403ms
+Avg Prediction Time: 0.5607518360417671ms
 170086 Entries
 	Non Tolerant
 TN = 166207	FP = 3345	FN = 3	TP = 531

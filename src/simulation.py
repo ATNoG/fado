@@ -1,13 +1,10 @@
-import csv
-from utils import BaseSimulation, Scenario, ScenarioManager
+from utils import BaseSimulation, Scenario, ScenarioManager, DB
 from probe import Probe, SysdigProbe
 from multiprocessing import Lock, Process, Event
 from .cleanup_data import cleanup
 import os
 from random import random
 from time import sleep
-
-DB = os.path.join(os.path.abspath(os.curdir), "data/logs")
 
 def monitor_data(
         data_path:str, 
@@ -18,32 +15,61 @@ def monitor_data(
         limit:int
         ):
     
-    output = open(data_path, "w")
-    counter = 0
-    probe = Probe(mntns, window_size)
+    # output = open(data_path, "w")
+    # counter = 0
+    counters = {}
+    output_list = {}
+    windows = [2, 3, 4, 6, 8, 10]
+
+    for i in windows:
+        counters[i] = 0
+        fn = data_path.replace("WSIZE", str(i))
+        output_list[i] = open(fn, 'w')
+
+    probe = Probe(mntns)
 
     while True: 
-        if stop_sim.is_set() or (limit and counter >= limit):
+        # if stop_sim.is_set() or (limit and counter >= limit):
+        if stop_sim.is_set():
             if not stop_sim.is_set(): stop_sim.set()
             while not exploit_flag.is_set():
                 sleep(0.2)
             data = probe.end_trace()
-            if limit > 0: print(f"Limit exceeded by {counter - limit} syscalls")
+            # if limit > 0: print(f"Limit exceeded by {counter - limit} syscalls")
         else:
             data = probe.get_data()
 
         if data:
-            tid_dict = probe.gen_sliding_window(data)
-            for _, syscalls in tid_dict.items():
-                counter += len(syscalls)
-                if syscalls == []:
-                    continue
-                for syscall_window in syscalls:
-                    output.write(f"{','.join(map(str, syscall_window))},{0}\n")
+            # tid_dict = probe.gen_sliding_window(data, window_size)
+            # for _, syscalls in tid_dict.items():
+            #     counter += len(syscalls)
+            #     if syscalls == []:
+            #         continue
+            #     for syscall_window in syscalls:
+            #         output.write(f"{','.join(map(str, syscall_window))},{0}\n")
+
+            new_window = []
+            for i in windows:
+                output = output_list[i]
+                tid_dict = probe.gen_sliding_window(data, i)
+                for _, syscalls in tid_dict.items():
+                    counters[i] += len(syscalls)
+                    if syscalls == []:
+                        continue
+                    for syscall_window in syscalls:
+                        output.write(f"{','.join(map(str, syscall_window))},{0}\n")
+                if limit and counters[i] >= limit:
+                    print(f"Limit exceeded by {counters[i] - limit} syscalls for window {i}")
+                else:
+                    new_window.append(i)
+            windows = new_window
+
+            if len(windows) == 0:
+                stop_sim.set()
 
         if stop_sim.is_set():
             print("Ending trace")
-            output.close()
+            # output.close()
             return
         sleep(0.5)
 
@@ -153,7 +179,7 @@ def gen_exploit(scenario:BaseSimulation, stop_sim, exploit_flag):
                 scenario.call_exploit()
             exploit_flag.set()
             counter += 1
-            chance /= 10
+            chance = 0
         sleep(0.5)  # control loop frequency (every 2000ms)
 
     # Guarantee at least one exploit before stopping
@@ -215,11 +241,13 @@ def simulate(
 
     if exploit:
         exploit_thread.join()
-
-        if baseline != None:
-            baseline += ".csv"
-            baseline = os.path.join(DB, baseline)
-            cleanup(baseline, data_path)
+        for i in [2, 3, 4, 6, 8, 10]:
+            bn = baseline.replace("WSIZE", str(i))
+            fn = data_path.replace("WSIZE", str(i))
+            if baseline != None:
+                bn += ".csv"
+                bn = os.path.join(DB, bn)
+                cleanup(bn, fn)
 
 
         

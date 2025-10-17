@@ -1,4 +1,5 @@
 import pandas as pd
+import sys
 
 def cleanup(baseline, data):
     baseline = pd.read_csv(baseline, header=None)
@@ -24,3 +25,6 @@ def cleanup(baseline, data):
     test_updated.to_csv(data, header=False, index=False)
 
     print(f"Saved cleaned file to {data}")
+
+if __name__ == "__main__":
+    cleanup(sys.argv[1], sys.argv[2])

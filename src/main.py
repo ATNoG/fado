@@ -22,10 +22,14 @@ def main():
         help="Maximum number of syscalls to trace before stopping (0 = no limit).",
         default=0,
         type=int)
-    parser.add_argument("-tol", "--tolerance",
-        help="Classification tolerance threshold (default: 0.6).",
-        default=0.6,
-        type=float)
+    # parser.add_argument("-tol", "--tolerance",
+    #     help="Classification tolerance threshold (default: 0.6).",
+    #     default=0.6,
+    #     type=float)
+    # parser.add_argument("-g", "--generalization",
+    #     help="Abstract most frequent sequences (default: 0.02).",
+    #     default=0.02,
+    #     type=float)
     parser.add_argument("-e", "--exploit",
         help="Trigger exploit during simulation (default: disabled).",
         default=False,
@@ -46,13 +50,17 @@ def main():
             type=int,
             default=50)
     parser.add_argument("--iterations",
-            help="Number of training iterations for the HMM (default: 100).",
+            help="Number of training iterations for the HMM (default: 500).",
             type=int,
-            default=100)
-    parser.add_argument("--train_data",
+            default=500)
+    parser.add_argument("-t", "--train",
             help="Path to training dataset",
             type=str)
-    parser.add_argument("--test_data",
+    parser.add_argument("-v", "--validation",
+            help="Path to training dataset",
+            type=str,
+            default=None)
+    parser.add_argument( "--test",
             help="Path to testing dataset",
             type=str)
     parser.add_argument("-fn", "--filename",
@@ -61,18 +69,18 @@ def main():
     parser.add_argument("-b", "--baseline",
             help="Path to baseline dataset.",
             type=str)
-    parser.add_argument("-s", "--simulation",
-            help="Enable simulation mode.",
-            action=argparse.BooleanOptionalAction)
-    parser.add_argument("-t", "--train",
-            help="Train Prediction Model",
-            action=argparse.BooleanOptionalAction)
-    parser.add_argument("--test",
-            help="Test Prediction Model",
-            action=argparse.BooleanOptionalAction)
+    # parser.add_argument("-s", "--simulation",
+    #         help="Enable simulation mode.",
+    #         action=argparse.BooleanOptionalAction)
+    # parser.add_argument("-t", "--train",
+    #         help="Train Prediction Model",
+    #         action=argparse.BooleanOptionalAction)
+    # parser.add_argument("--test",
+    #         help="Test Prediction Model",
+    #         action=argparse.BooleanOptionalAction)
     args = parser.parse_args()
     
-    if args.simulation:
+    if args.scenario != None:
         simulate(
             scenarioID = args.scenario,
             limit = args.limit,
@@ -91,32 +99,34 @@ def main():
         exit(-1)
 
     if args.train or args.test:
-        model = HMM(args.model_file, n_components=args.states, n_iter=args.iterations)
+        model = HMM(args.model_file,
+                     n_components=args.states,
+                     n_iter=args.iterations)
 
     if args.train:
-        if not args.train_data:
-            print("Missing train data")
-            exit(-1)
+        # if not args.train_data:
+        #     print("Missing train data")
+        #     exit(-1)
 
         print("Train Triggered")
-        model.train(args.train_data)
+        model.train(args.train,
+                     validation_data=args.validation)
         if not args.test:
             exit(0)
 
     if args.test:
-        if not args.test_data:
-            print("Missing test data")
-            exit(-1)
+        # if not args.test_data:
+        #     print("Missing test data")
+        #     exit(-1)
 
         print("Test Triggered")
-        model.test(args.test_data, args.tolerance)
+        model.test(args.test)
         exit(0)
 
     print("Tracing...")
     trace(
         model_file = args.model_file, 
-        mntns = args.mntnsmap,
-        tolerance = args.tolerance)
+        mntns = args.mntnsmap)
     exit(0)
 
 if __name__== '__main__':

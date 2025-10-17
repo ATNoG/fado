@@ -29,7 +29,7 @@ At runtime, the tracing logic will filter syscalls so that **only the ones match
 
 ### Setup Instructions
 
-> Launch the container to be traced prior to this setup
+> ⚠️ **Launch the container to be traced prior to this setup**
 
 ```
 sudo bpftool map create /sys/fs/bpf/mnt_ns_set type hash key 8 value 4 entries 128 \
@@ -91,7 +91,7 @@ To check the entries already in the map
 sudo venv/bin/python3 -m src.main -s \
     -sc 1 \                       # Scenario ID
     -d 60 \                       # Duration in seconds
-    -l 10000 \                     # Stop after 10000 syscalls (0 = unlimited)
+    -l 10000 \                    # Stop after 10000 syscalls (0 = unlimited)
     -e \                          # Trigger exploit during simulation
     -fn output.csv                # Custom output filename
 ```
@@ -103,6 +103,7 @@ sudo venv/bin/python3 -m src.main -m hmm \
     --train_data data/logs/train.csv \
     --states 100 \                 # Number of hidden states
     --iterations 200               # Training iterations
+    --generalization 0.02          # Whitelist frequency boundary
 ```
 
 ### Test Model
