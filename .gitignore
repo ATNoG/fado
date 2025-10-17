@@ -65,7 +65,7 @@ ignore/
 *.env
 
 *.pkl
-*.csv
 *.log
 *.pdf
 *.txt
+data/

@@ -109,8 +109,7 @@ def main():
         #     exit(-1)
 
         print("Train Triggered")
-        model.train(args.train,
-                     validation_data=args.validation)
+        model.train(args.train)
         if not args.test:
             exit(0)
 

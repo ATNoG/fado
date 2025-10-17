@@ -69,6 +69,7 @@ class HMM:
         validation_data = validation_data.to_numpy()
 
         print(f"Old threshold: {self.threshold}")
+        print(f"Whitelist size: {len(self.whitelist)}")
 
         for sequence in tqdm(validation_data):
             if tuple(sequence) in self.whitelist:
@@ -87,21 +88,21 @@ class HMM:
 
 
 
-    def train(self, train_data, validation_data=None):
+    def train(self, train_data):
         train_data = os.path.join(DB, train_data.removesuffix(".csv")) + ".csv"
         train_data = pd.read_csv(train_data, header=None)
         train_data.drop(train_data.columns[-1], axis=1, inplace=True)
         self.window_size = train_data.shape[1]
 
-        if validation_data:
-            validation_data = os.path.join(DB, validation_data.removesuffix(".csv")) + ".csv"
-            validation_data = pd.read_csv(validation_data, header=None)
-            validation_data.drop(validation_data.columns[-1], axis=1, inplace=True)
-        else:
-            train_size = int(len(train_data) * 0.8)
-            validation_data = train_data.iloc[train_size:]
-            train_data = train_data.iloc[:train_size]
-        validation_data = validation_data.to_numpy()
+        # if validation_data:
+        #     validation_data = os.path.join(DB, validation_data.removesuffix(".csv")) + ".csv"
+        #     validation_data = pd.read_csv(validation_data, header=None)
+        #     validation_data.drop(validation_data.columns[-1], axis=1, inplace=True)
+        # else:
+        #     train_size = int(len(train_data) * 0.8)
+        #     validation_data = train_data.iloc[train_size:]
+        #     train_data = train_data.iloc[:train_size]
+        # validation_data = validation_data.to_numpy()
 
             # Numpy array (ensure contiguous)
         arr = np.ascontiguousarray(train_data.to_numpy())
@@ -143,7 +144,9 @@ class HMM:
         predictions = []
         avg = 0
 
-        for sequence in tqdm(validation_data):
+        train_data = train_data.to_numpy()
+
+        for sequence in tqdm(train_data):
             if tuple(sequence) in self.whitelist:
                 continue
             seq = np.array(sequence).reshape(-1,1)
