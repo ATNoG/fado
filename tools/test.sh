@@ -12,7 +12,7 @@ fi
 
 NAME=$1
 MAX_JOBS=3
-W_LIST=(2 3 4 6 8 10)
+W_LIST=(2)
 STATES_LIST=(5 10 30 50)
 
 echo "=== Starting model evaluation in parallel ==="

@@ -59,50 +59,13 @@ class HMM:
             print("Creating Model...")
             self.model = CategoricalHMM(n_components=self.components, n_features=self.n_features, n_iter=self.iter, random_state=42, verbose=True)
             self.model.monitor_ = EarlyStop(self.model.n_iter, 0.1, 5, True)
-    
-    def validation(self, validation_data):
-        validation_data = os.path.join(DB, validation_data.removesuffix(".csv")) + ".csv"
-        validation_data = pd.read_csv(validation_data, header=None)
-        validation_data.drop(validation_data.columns[-1], axis=1, inplace=True)
-        predictions = []
-
-        validation_data = validation_data.to_numpy()
-
-        print(f"Old threshold: {self.threshold}")
-        print(f"Whitelist size: {len(self.whitelist)}")
-
-        for sequence in tqdm(validation_data):
-            if tuple(sequence) in self.whitelist:
-                continue
-            seq = np.array(sequence).reshape(-1,1)
-            prediction = self.model.score(seq, [self.window_size])
-            predictions.append(prediction)
-
-        self.threshold = min(predictions)
-        print(f"New threshold: {self.threshold}")
-
-        print(f"Whitelist size: {len(self.whitelist)}")
-
-        with open(self.model_file, 'wb') as f:
-            pickle.dump({'model': self.model, 'threshold': self.threshold, 'window_size': self.window_size, 'whitelist': self.whitelist}, f)
-
-
+ 
 
     def train(self, train_data):
         train_data = os.path.join(DB, train_data.removesuffix(".csv")) + ".csv"
         train_data = pd.read_csv(train_data, header=None)
         train_data.drop(train_data.columns[-1], axis=1, inplace=True)
         self.window_size = train_data.shape[1]
-
-        # if validation_data:
-        #     validation_data = os.path.join(DB, validation_data.removesuffix(".csv")) + ".csv"
-        #     validation_data = pd.read_csv(validation_data, header=None)
-        #     validation_data.drop(validation_data.columns[-1], axis=1, inplace=True)
-        # else:
-        #     train_size = int(len(train_data) * 0.8)
-        #     validation_data = train_data.iloc[train_size:]
-        #     train_data = train_data.iloc[:train_size]
-        # validation_data = validation_data.to_numpy()
 
             # Numpy array (ensure contiguous)
         arr = np.ascontiguousarray(train_data.to_numpy())
@@ -225,7 +188,7 @@ class HMM:
                     new_scores.append(score)
 
 
-            if sum(tolerant_queue) > (len(tolerant_queue) * TOLERANCE):
+            if sum(tolerant_queue) >= (len(tolerant_queue) * TOLERANCE):
                 tolerant_predictions.append(1)
             else:
                 tolerant_predictions.append(0)
@@ -257,36 +220,63 @@ class HMM:
         ax.margins(x=0, y=0)
 
         plt.savefig(
-            os.path.join(FIGS, f"{self.name}_log_likelihood_8.pdf"),
+            os.path.join(FIGS, f"{self.name}_log_likelihood_8.png"),
             bbox_inches="tight",
             pad_inches=0)
         
 
-        ### TOLERANT
+        # ### TOLERANT
         plt.figure(figsize=(14, 8))
         plt.rcParams.update({'font.size': 23})
 
         # Split points
-        norm_idx = [i for i, f in enumerate(tolerant_prediction_flags) if f == 0]
-        anom_idx = [i for i, f in enumerate(tolerant_prediction_flags) if f == 1]
+        norm_idx = np.array([i for i, f in enumerate(tolerant_prediction_flags) if f == 0])
+        anom_idx = np.array([i for i, f in enumerate(tolerant_prediction_flags) if f == 1])
 
-        # Plot normals first (lighter green)
-        plt.scatter(np.array(norm_idx), np.array(new_scores)[norm_idx], c='green', s=80, alpha=0.4, label='Normal')
+        sc = np.asarray(new_scores)
 
-        # Plot anomalies second (opaque red, top layer)
-        plt.scatter(np.array(anom_idx), np.array(new_scores)[anom_idx], c='red', s=120, alpha=0.9, label='Anomalous')
+        fn_idx = anom_idx[sc[anom_idx] < self.threshold]
 
-        plt.axhline(y=self.threshold, color='blue', linestyle='dashed', label="Threshold")
+        # True normals (predicted normal and above threshold)
+        true_anom_idx = np.setdiff1d(anom_idx, fn_idx, assume_unique=True)
+
+        # --- Plot ---
+        # 1) True normals (lighter green)
+        plt.scatter(norm_idx, sc[norm_idx],
+                    c='green', s=80, alpha=0.4, label='Normal', zorder=1)
+
+        # 2) Anomalies (opaque red)
+        plt.scatter(fn_idx, sc[fn_idx],
+                    c='red', s=120, alpha=0.9, label='Anomalous', zorder=2)
+
+        # 3) Missed sequences (false negatives) — make them stand out
+        plt.scatter(true_anom_idx, sc[true_anom_idx],
+                    c='orange', s=140, alpha=0.95, marker='x', linewidths=2,
+                    label='Missed Sequences', zorder=3)
+
+        # Threshold line
+        plt.axhline(y=self.threshold, color='blue', linestyle='dashed', linewidth=4, label="Threshold")
+
+        # Axes & formatting
         plt.xlabel("Sequence Index")
         plt.ylabel("Log-Likelihood Score")
         ax = plt.gca()
         ax.xaxis.set_major_formatter(EngFormatter())
         ax.margins(x=0, y=0)
-        
+
+
+        # Legend (avoid duplicates and keep compact)
+        handles, labels = ax.get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        ax.legend(by_label.values(), by_label.keys(), loc='lower right', framealpha=0.9)
+
+        # Save
+        plt.tight_layout()
         plt.savefig(
-            os.path.join(FIGS, f"tolerant_{self.name}_log_likelihood_8.pdf"),
+            os.path.join(FIGS, f"tolerant_{self.name}_log_likelihood.png"),
             bbox_inches="tight",
-            pad_inches=0)
+            pad_inches=0
+        )
 
         avg_pred_time = (avg / counter) / 1e6
 

@@ -1,7 +1,0 @@
-Training Time: 249.0 min
-Avg Prediction Time: 0.5807255496584409ms
-10 States
-500 Iterations
--36.78241896689427 Threshold
-154878 Entries
-154878 Filtered Entries with 10.0 generalization

@@ -19,7 +19,7 @@ shift 2  # "$@" now holds all W values
 # sudo venv/bin/python3 -m src.main -sc "$NUM" -w "$W" -fn "${NAME}_WSIZE_validation" -d 720 -l 200000 # 12 min
 # sudo venv/bin/python3 -m src.main -sc "$NUM" -w "$W" -fn "baseline_${NAME}_WSIZE" -l 2000000 -d 7200 # 2 hours
 # sudo venv/bin/python3 -m src.main -sc "$NUM" -w "$W" -fn "${NAME}_WSIZE" -l 500000 -d 1800 # 30 min
-sudo venv/bin/python3 -m src.main -sc "$NUM" -w "$W" -fn "${NAME}_WSIZE_test_v2" -l 800000 -e -b "baseline_${NAME}_WSIZE" -d 2700 # 45 min
+# sudo venv/bin/python3 -m src.main -sc "$NUM" -w "$W" -fn "${NAME}_WSIZE_test_v2" -l 800000 -e -b "baseline_${NAME}_WSIZE" -d 2700 # 45 min
 
 # # --- Stage 1: Data generation ---
 # for W in "$@"; do

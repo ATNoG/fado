@@ -29,13 +29,13 @@ while True:
         print(f"CPU percentage: {process_dict["pcpu"]}")
         print(f"Mem usage: {process_dict["uss"]} Mb")
         print(f"Mem percentage: {process_dict["pmem"]}")
-        if counter >= 121:
+        if counter >= 241:
             counter -= 1
             avg_cpu_perc /= counter
             avg_cpu_time /= counter
             avg_mem_use /= counter
 
-            with open("scripts/specs.txt", 'a') as f:
+            with open("tools/specs.txt", 'a') as f:
                 f.write(f"{sys.argv[2]}\nPCPU, {avg_cpu_perc}\nCPU, {avg_cpu_time}\nMEM, {avg_mem_use}\n")
             exit()
         sleep(1)

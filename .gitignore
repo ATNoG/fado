@@ -68,4 +68,4 @@ ignore/
 *.log
 *.pdf
 *.txt
-data/
+eval/

@@ -3,9 +3,9 @@ from probe import Probe
 from pickle import load
 from collections import defaultdict, deque
 import os
-from utils import FILES
+from utils import FILES, TOLERANCE
 
-def trace(model_file:str, mntns:str="/sys/fs/bpf/mnt_ns_set", tolerance:int=0.6):
+def trace(model_file:str, mntns:str="/sys/fs/bpf/mnt_ns_set"):
     model_file = os.path.join(FILES, model_file) + ".pkl"
 
     with open(model_file, 'rb') as f:
@@ -48,7 +48,7 @@ def trace(model_file:str, mntns:str="/sys/fs/bpf/mnt_ns_set", tolerance:int=0.6)
                             seq = np_array(sequence).reshape(-1,1)
                             score = model.score(seq, [len(sequence)])
                             results.append(1 if score < threshold or isneginf(score) else 0)
-                        if sum(results) > len(results) * tolerance:
+                        if sum(results) > len(results) * TOLERANCE:
                             flag = 1
 
                     if flag == 1:
@@ -76,7 +76,7 @@ def trace(model_file:str, mntns:str="/sys/fs/bpf/mnt_ns_set", tolerance:int=0.6)
                     seq = np_array(sequence).reshape(-1,1)
                     score = model.score(seq, [len(sequence)])
                     results.append(1 if score < threshold or isneginf(score) else 0)
-                    if sum(results) > len(results) * tolerance:
+                    if sum(results) > len(results) * TOLERANCE:
                         flag = 1
 
                 if flag == 1:

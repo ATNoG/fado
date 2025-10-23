@@ -30,7 +30,6 @@ for NAME in "${NAMES[@]}"; do
                 -m "$MODEL_NAME" \
                 --states "$STATES" \
                 -t "${NAME}_${W}" \
-                -v "${NAME}_${W}_validation" \
                 --test "${NAME}_${W}_test_v2" \
                 > "eval/eval_${MODEL_NAME}.log" 2>&1 &
 
