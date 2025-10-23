@@ -14,7 +14,7 @@ source fado_env/bin/activate
 
 pip install -r requirements.txt
 ```
-**Follow the BCC install described [here](https://github.com/iovisor/bcc/blob/master/INSTALL.md#ubuntu---source)**
+>**Follow the BCC install described [here](https://github.com/iovisor/bcc/blob/master/INSTALL.md#ubuntu---source)**
 
 > ⚠️ **Important:**  
 > To allow eBPF to probe syscall logs, all commands must be executed with sudo using the virtual environment’s Python.
@@ -29,6 +29,7 @@ At runtime, the tracing logic will filter syscalls so that **only the ones match
 > The framework supports **only one container at a time**. Every time you launch a new container, you must manually update the map with the namespace ID of that container and stop or remove the previous one. Otherwise, syscalls from the new container will not be captured.  
 
 ### Setup Instructions
+This script can be used to tell FADO the container namespace to trace. It automatically passes the one corresponding to the firts container ID it finds, to specify it set the CONTAINERID accordingly.
 
 > ⚠️ **Launch the container to be traced prior to this setup**
 
