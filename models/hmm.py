@@ -5,7 +5,6 @@ from hmmlearn.base import ConvergenceMonitor
 import pandas as pd
 import pickle
 import numpy as np
-from collections import defaultdict
 import os
 from collections import deque
 from time import time_ns, time
@@ -13,11 +12,8 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import EngFormatter
 from matplotlib.colors import LogNorm
 from sklearn.metrics import confusion_matrix, accuracy_score, classification_report
+from utils import STATS, FIGS, FILES, DB, TOLERANCE, WHITELIST_FREQUENCY
 
-STATS = os.path.join(os.path.abspath(os.curdir), "data/stats")
-FIGS = os.path.join(os.path.abspath(os.curdir), "data/figs")
-FILES = os.path.join(os.path.abspath(os.curdir), "data/files")
-DB = os.path.join(os.path.abspath(os.curdir), "data/logs")
 
 class EarlyStop(ConvergenceMonitor):
     def __init__(self, n_iter=100, tol=1e-2, patience=5, verbose=False):
@@ -49,7 +45,7 @@ class HMM:
         self.threshold = 0
         self.window_size = None
         self.name = model_file
-        self.stide = set()
+        self.whitelist = set()
 
         if os.path.exists(self.model_file):
             print("Loading Model...")
@@ -58,13 +54,14 @@ class HMM:
             self.model = saved_data['model']
             self.threshold = saved_data['threshold']
             self.window_size = saved_data['window_size']
+            self.whitelist = saved_data['whitelist']
         else:
             print("Creating Model...")
             self.model = CategoricalHMM(n_components=self.components, n_features=self.n_features, n_iter=self.iter, random_state=42, verbose=True)
             self.model.monitor_ = EarlyStop(self.model.n_iter, 0.1, 5, True)
+ 
 
     def train(self, train_data):
-        seq_counter = defaultdict(int)
         train_data = os.path.join(DB, train_data.removesuffix(".csv")) + ".csv"
         train_data = pd.read_csv(train_data, header=None)
         train_data.drop(train_data.columns[-1], axis=1, inplace=True)
@@ -87,21 +84,19 @@ class HMM:
         freqs = counts / n_rows
 
         # Identify frequent sequences (> threshold)
-        frequent_mask = freqs > 0.1
+        frequent_mask = freqs > WHITELIST_FREQUENCY
         frequent_structs = uniq_rows[frequent_mask]
 
-        # Update STIDE set (store as tuples for readability/interoperability)
-        # NOTE: `stide` is assumed to be a mutable set-like (e.g., set()).
         if len(frequent_structs):
             # Convert structured back to tuples only for the frequent ones (small)
             frequent_arr = frequent_structs.view(arr.dtype).reshape(-1, arr.shape[1])
             for row in frequent_arr:
-                self.stide.add(tuple(row.tolist()))
+                self.whitelist.add(tuple(row.tolist()))
 
         # ---- Filter out frequent sequences in one vectorized shot ----
         to_drop_mask = np.isin(structured, frequent_structs, assume_unique=False)
         filtered = arr[~to_drop_mask]
-        print(len(filtered))
+        print(f"Filtered train data size ({WHITELIST_FREQUENCY * 100}%): {len(filtered)}")
         X = filtered.reshape(-1, 1)
         lengths = [self.window_size] * len(filtered)
         stime = time()
@@ -113,6 +108,8 @@ class HMM:
         avg = 0
 
         for sequence in tqdm(filtered):
+            if tuple(sequence) in self.whitelist:
+                continue
             seq = np.array(sequence).reshape(-1,1)
             stime = time_ns()
             prediction = self.model.score(seq, [self.window_size])
@@ -120,11 +117,9 @@ class HMM:
             predictions.append(prediction)
 
         self.threshold = min(predictions)
+        print(f"Threshold: {self.threshold}")
         avg_pred_time = (avg / len(train_data)) / 1e6
         print(f"\nAvg prediction time: {(avg_pred_time):.3f}ms")
-
-            
-
 
         with open(os.path.join(STATS, f"{self.name}_train.txt"), 'w') as stats:
             stats.write(
@@ -134,12 +129,13 @@ class HMM:
                 f"{self.iter} Iterations\n"
                 f"{self.threshold} Threshold\n"
                 f"{len(train_data)} Entries\n"
+                f"{len(filtered)} Filtered Entries with {WHITELIST_FREQUENCY * 100} generalization"
             )
 
         with open(self.model_file, 'wb') as f:
-            pickle.dump({'model': self.model, 'threshold': self.threshold, 'window_size': self.window_size, 'stide': self.stide}, f)
+            pickle.dump({'model': self.model, 'threshold': self.threshold, 'window_size': self.window_size, 'whitelist': self.whitelist}, f)
 
-    def test(self, test_data, tolerance=0.6):
+    def test(self, test_data):
         test_data = os.path.join(DB, test_data) + ".csv"
         test_data = pd.read_csv(test_data, header=None)
         flags = test_data.iloc[:, -1].copy()
@@ -153,30 +149,19 @@ class HMM:
         tolerant_queue = deque([0] * 10, maxlen=10)
         tolerant_flags = deque([0] * 10, maxlen=10)
         tolerant_prediction_flags = []
+        new_scores = []
+        counter = 0
 
         for flag, sequence in enumerate(tqdm(Y)):
             tolerant_flags.append(flags[flag])
-            if str(sequence.tolist()) in self.stide:
-                scores.append(0)
-                predictions.append(0)
-                tolerant_queue.append(0)
-                if sum(tolerant_flags) > (len(tolerant_queue) * tolerance):
-                    tolerant_prediction_flags.append(1)
-                else:
-                    tolerant_prediction_flags.append(0)
-
-
-                if sum(tolerant_queue) > (len(tolerant_queue) * tolerance):
-                    tolerant_predictions.append(1)
-                else:
-                    tolerant_predictions.append(0)
-                continue
-
-            seq = np.array(sequence).reshape(-1,1)
-            stime = time_ns()
-            score = self.model.score(seq, [self.window_size])
-            avg += time_ns() - stime
-            # tolerant_flags.append(flags[flag])
+            if tuple(sequence.tolist()) in self.whitelist:
+                score = self.threshold + 1
+            else:
+                seq = np.array(sequence).reshape(-1,1)
+                stime = time_ns()
+                score = self.model.score(seq, [self.window_size])
+                avg += time_ns() - stime
+                counter += 1
 
             if np.isneginf(score):
                 scores.append(self.threshold - 100)
@@ -190,36 +175,114 @@ class HMM:
                 predictions.append(0)
                 tolerant_queue.append(0)
 
-            if sum(tolerant_flags) > (len(tolerant_queue) * tolerance):
+
+            ## Make sure that it isnt an isolated case of anomaly which indicates mislabelling
+            if flags[flag] == 1 and sum(tolerant_flags) > (len(tolerant_queue) * TOLERANCE):
                 tolerant_prediction_flags.append(1)
+                new_scores.append(score)
             else:
                 tolerant_prediction_flags.append(0)
+                if flags[flag] == 1:
+                    new_scores.append(self.threshold + 1)
+                else:
+                    new_scores.append(score)
 
 
-            if sum(tolerant_queue) > (len(tolerant_queue) * tolerance):
+            if sum(tolerant_queue) >= (len(tolerant_queue) * TOLERANCE):
                 tolerant_predictions.append(1)
             else:
                 tolerant_predictions.append(0)
 
+
+        # GENERATE FIGURES AND STATISTICAL DATA
+
+        ## LOG-LIKELIHOOD 
+
+        ### NORMAL
         plt.figure(figsize=(14, 8))
         plt.rcParams.update({'font.size': 23})
-        colors = ['red' if flag == 1 else 'green' for flag in flags]
-        plt.scatter(range(len(scores)), scores, c=colors, s=100)
+
+        # Split points
+        norm_idx = [i for i, f in enumerate(flags) if f == 0]
+        anom_idx = [i for i, f in enumerate(flags) if f == 1]
+
+        # Plot normals first (lighter green)
+        plt.scatter(np.array(norm_idx), np.array(scores)[norm_idx], c='green', s=80, alpha=0.4, label='Normal')
+
+        # Plot anomalies second (opaque red, top layer)
+        plt.scatter(np.array(anom_idx), np.array(scores)[anom_idx], c='red', s=120, alpha=0.9, label='Anomalous')
+
         plt.axhline(y=self.threshold, color='blue', linestyle='dashed', label="Threshold")
         plt.xlabel("Sequence Index")
         plt.ylabel("Log-Likelihood Score")
         ax = plt.gca()
         ax.xaxis.set_major_formatter(EngFormatter())
         ax.margins(x=0, y=0)
+
         plt.savefig(
-            os.path.join(FIGS, f"{self.name}_log_likelihood.pdf"),
+            os.path.join(FIGS, f"{self.name}_log_likelihood_8.png"),
             bbox_inches="tight",
             pad_inches=0)
+        
 
-        avg_pred_time = (avg / len(Y)) / 1e6
+        # ### TOLERANT
+        plt.figure(figsize=(14, 8))
+        plt.rcParams.update({'font.size': 23})
+
+        # Split points
+        norm_idx = np.array([i for i, f in enumerate(tolerant_prediction_flags) if f == 0])
+        anom_idx = np.array([i for i, f in enumerate(tolerant_prediction_flags) if f == 1])
+
+        sc = np.asarray(new_scores)
+
+        fn_idx = anom_idx[sc[anom_idx] < self.threshold]
+
+        # True normals (predicted normal and above threshold)
+        true_anom_idx = np.setdiff1d(anom_idx, fn_idx, assume_unique=True)
+
+        # --- Plot ---
+        # 1) True normals (lighter green)
+        plt.scatter(norm_idx, sc[norm_idx],
+                    c='green', s=80, alpha=0.4, label='Normal', zorder=1)
+
+        # 2) Anomalies (opaque red)
+        plt.scatter(fn_idx, sc[fn_idx],
+                    c='red', s=120, alpha=0.9, label='Anomalous', zorder=2)
+
+        # 3) Missed sequences (false negatives) — make them stand out
+        plt.scatter(true_anom_idx, sc[true_anom_idx],
+                    c='orange', s=140, alpha=0.95, marker='x', linewidths=2,
+                    label='Missed Sequences', zorder=3)
+
+        # Threshold line
+        plt.axhline(y=self.threshold, color='blue', linestyle='dashed', linewidth=4, label="Threshold")
+
+        # Axes & formatting
+        plt.xlabel("Sequence Index")
+        plt.ylabel("Log-Likelihood Score")
+        ax = plt.gca()
+        ax.xaxis.set_major_formatter(EngFormatter())
+        ax.margins(x=0, y=0)
+
+
+        # Legend (avoid duplicates and keep compact)
+        handles, labels = ax.get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        ax.legend(by_label.values(), by_label.keys(), loc='lower right', framealpha=0.9)
+
+        # Save
+        plt.tight_layout()
+        plt.savefig(
+            os.path.join(FIGS, f"tolerant_{self.name}_log_likelihood.png"),
+            bbox_inches="tight",
+            pad_inches=0
+        )
+
+        avg_pred_time = (avg / counter) / 1e6
 
         print(f"\nAvg prediction time: {(avg_pred_time):.3f}ms")
 
+        ## CONFUSION MATRICES
         print("\nConfusion Matrix:")
         cm = confusion_matrix(flags, predictions)
         print(cm)
@@ -229,11 +292,11 @@ class HMM:
         print(tcm)
 
         tn, fp, fn, tp = cm.ravel()
-        mcc = (tp*tn - fp*fn)/((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn))**0.5
+        mcc = (tp*tn - fp*fn)/(((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn))**0.5)
         print(f"\nMatthews Correlation Coefficient (MCC): {mcc}")
 
         ttn, tfp, tfn, ttp = tcm.ravel()
-        tmcc = (ttp*tn - tfp*tfn)/((ttp+tfp)*(ttp+tfn)*(ttn+tfp)*(ttn+tfn))**0.5
+        tmcc = (ttp*ttn - tfp*tfn)/(((ttp+tfp)*(ttp+tfn)*(ttn+tfp)*(ttn+tfn))**0.5)
         print(f"\nTolerant Matthews Correlation Coefficient (MCC): {tmcc}")
 
         plt.figure(figsize=(14, 8))
@@ -272,7 +335,7 @@ class HMM:
         plt.tight_layout()
         ax.margins(x=0, y=0)
         plt.savefig(
-            os.path.join(FIGS, f"{self.name}_cm.pdf"),
+            os.path.join(FIGS, f"{self.name}_cm_8.pdf"),
             bbox_inches="tight",
             pad_inches=0)
 
@@ -281,7 +344,7 @@ class HMM:
 
         print(f"\nAccuracy: {accuracy_score(flags, predictions):.2f}")
 
-        with open(os.path.join(STATS, f"{self.name}_test.txt"), 'w') as stats:
+        with open(os.path.join(STATS, f"{self.name}_test_8.txt"), 'w') as stats:
             stats.write(
                 f"Avg Prediction Time: {avg_pred_time}ms\n"
                 f"{len(test_data)} Entries\n"
@@ -290,5 +353,5 @@ class HMM:
                 f"MCC = {mcc}\n"
                 "\tTolerant\n"
                 f"TN = {ttn}\tFP = {tfp}\tFN = {tfn}\tTP = {ttp}\n"
-                f"MCC = {tmcc}\n"
+                f"TMCC = {tmcc}\n"
             )

@@ -3,10 +3,9 @@ from probe import Probe
 from pickle import load
 from collections import defaultdict, deque
 import os
+from utils import FILES, TOLERANCE
 
-FILES = os.path.join(os.path.abspath(os.curdir), "data/files")
-
-def trace(model_file:str, mntns:str="/sys/fs/bpf/mnt_ns_set", tolerance:int=0.6):
+def trace(model_file:str, mntns:str="/sys/fs/bpf/mnt_ns_set"):
     model_file = os.path.join(FILES, model_file) + ".pkl"
 
     with open(model_file, 'rb') as f:
@@ -14,6 +13,7 @@ def trace(model_file:str, mntns:str="/sys/fs/bpf/mnt_ns_set", tolerance:int=0.6)
         model = saved_data['model']
         threshold = saved_data['threshold']
         window_size = saved_data['window_size']
+        whitelist = saved_data['whitelist']
 
     probe = Probe(mntns)
     results = deque([0] * 10, maxlen=10)
@@ -42,10 +42,13 @@ def trace(model_file:str, mntns:str="/sys/fs/bpf/mnt_ns_set", tolerance:int=0.6)
                     for i in range(0, len(syscalls) - window_size + 1):
 
                         sequence = syscalls[i:i + window_size]
-                        seq = np_array(sequence).reshape(-1,1)
-                        score = model.score(seq, [len(sequence)])
-                        results.append(1 if score < threshold or isneginf(score) else 0)
-                        if sum(results) > len(results) * tolerance:
+                        if tuple(sequence) in whitelist:
+                            results.append(0)
+                        else:
+                            seq = np_array(sequence).reshape(-1,1)
+                            score = model.score(seq, [len(sequence)])
+                            results.append(1 if score < threshold or isneginf(score) else 0)
+                        if sum(results) > len(results) * TOLERANCE:
                             flag = 1
 
                     if flag == 1:
@@ -73,7 +76,7 @@ def trace(model_file:str, mntns:str="/sys/fs/bpf/mnt_ns_set", tolerance:int=0.6)
                     seq = np_array(sequence).reshape(-1,1)
                     score = model.score(seq, [len(sequence)])
                     results.append(1 if score < threshold or isneginf(score) else 0)
-                    if sum(results) > len(results) * tolerance:
+                    if sum(results) > len(results) * TOLERANCE:
                         flag = 1
 
                 if flag == 1:

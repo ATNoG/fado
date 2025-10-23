@@ -1,0 +1,8 @@
+Avg Prediction Time: 0.49774588528042757ms
+90005 Entries
+	Non Tolerant
+TN = 89816	FP = 2	FN = 4	TP = 183
+MCC = 0.9838518464138043
+	Tolerant
+TN = 89841	FP = 18	FN = 2	TP = 144
+TMCC = 0.9362223669532583

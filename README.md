@@ -14,6 +14,7 @@ source fado_env/bin/activate
 
 pip install -r requirements.txt
 ```
+>**Follow the BCC install described [here](https://github.com/iovisor/bcc/blob/master/INSTALL.md#ubuntu---source)**
 
 > ⚠️ **Important:**  
 > To allow eBPF to probe syscall logs, all commands must be executed with sudo using the virtual environment’s Python.
@@ -28,8 +29,9 @@ At runtime, the tracing logic will filter syscalls so that **only the ones match
 > The framework supports **only one container at a time**. Every time you launch a new container, you must manually update the map with the namespace ID of that container and stop or remove the previous one. Otherwise, syscalls from the new container will not be captured.  
 
 ### Setup Instructions
+This script can be used to tell FADO the container namespace to trace. It automatically passes the one corresponding to the firts container ID it finds, to specify it set the CONTAINERID accordingly.
 
-> Launch the container to be traced prior to this setup
+> ⚠️ **Launch the container to be traced prior to this setup**
 
 ```
 sudo bpftool map create /sys/fs/bpf/mnt_ns_set type hash key 8 value 4 entries 128 \
@@ -67,40 +69,38 @@ To check the entries already in the map
 
 2. **Model Training (`--train`)**  
    - Requires `--model_file` (where to save/load the model).  
-   - Requires `--train_data`.  
+   - Requires `train_data`.  
    - Builds an HMM with parameters:  
      - Hidden states: `--states`  
      - Iterations: `--iterations`  
    - Saves the trained model to `--model_file`.  
 
 3. **Model Testing (`--test`)**  
-   - Requires `--model_file` and `--test_data`.  
+   - Requires `--model_file` and `test_data`.  
    - Loads the HMM from file.  
-   - Evaluates test dataset against tolerance (`--tolerance`).  
 
 4. **Live Tracing (default fallback)**  
    - If no `--simulation`, `--train`, or `--test` is specified:  
-   - Attaches to kernel probes to trace syscalls in real time.  
-   - Performs anomaly detection using `--model_file` and `--tolerance`.  
+   - Attaches to kernel probes to trace syscalls in real-time.  
+   - Performs anomaly detection using `--model_file`.  
 
 
 ## Example Commands
 
 ### Run a Simulation
 ```
-sudo venv/bin/python3 -m src.main -s \
+sudo venv/bin/python3 -m src.main \
     -sc 1 \                       # Scenario ID
     -d 60 \                       # Duration in seconds
-    -l 10000 \                     # Stop after 10000 syscalls (0 = unlimited)
+    -l 10000 \                    # Stop after 10000 syscalls (0 = unlimited)
     -e \                          # Trigger exploit during simulation
-    -fn output.csv                # Custom output filename
+    -fn output                    # Custom output filename
 ```
 
 ### Train Model
 ```
 sudo venv/bin/python3 -m src.main -m hmm \
-    -t \                          # Enable training mode
-    --train_data data/logs/train.csv \
+    -t data/logs/train.csv \       # Enable training mode
     --states 100 \                 # Number of hidden states
     --iterations 200               # Training iterations
 ```
@@ -108,15 +108,12 @@ sudo venv/bin/python3 -m src.main -m hmm \
 ### Test Model
 ```
 sudo venv/bin/python3 -m src.main -m hmm \
-    --test \                       # Enable test mode
-    --test_data data/logs/test.csv \
-    --tol 0.6                      # Classification tolerance
-
+    --test data/logs/test.csv \     # Enable test mode
 ```
 
 ### Dynamic Anomaly Detection 
 ```
-sudo venv/bin/python3 -m src.main -m hmm -tol 0.5
+sudo venv/bin/python3 -m src.main -m hmm
 ```
 
 ## Directory Tree

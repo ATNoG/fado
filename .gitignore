@@ -63,3 +63,7 @@ static/
 *.yaml
 ignore/
 *.env
+
+*.log
+*.pdf
+eval/
