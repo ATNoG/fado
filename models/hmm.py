@@ -1,17 +1,10 @@
-import seaborn as sns
-from tqdm import tqdm
 from hmmlearn.hmm import CategoricalHMM
 from hmmlearn.base import ConvergenceMonitor
-import pandas as pd
 import pickle
 import numpy as np
 import os
 from collections import deque
 from time import time_ns, time
-import matplotlib.pyplot as plt
-from matplotlib.ticker import EngFormatter
-from matplotlib.colors import LogNorm
-from sklearn.metrics import confusion_matrix, accuracy_score, classification_report
 from utils import STATS, FIGS, FILES, DB, TOLERANCE, WHITELIST_FREQUENCY
 
 
@@ -62,6 +55,9 @@ class HMM:
  
 
     def train(self, train_data):
+        from tqdm import tqdm
+        import pandas as pd
+
         train_data = os.path.join(DB, train_data.removesuffix(".csv")) + ".csv"
         train_data = pd.read_csv(train_data, header=None)
         train_data.drop(train_data.columns[-1], axis=1, inplace=True)
@@ -136,6 +132,15 @@ class HMM:
             pickle.dump({'model': self.model, 'threshold': self.threshold, 'window_size': self.window_size, 'whitelist': self.whitelist}, f)
 
     def test(self, test_data):
+        import seaborn as sns
+        from tqdm import tqdm
+        import pandas as pd
+        import matplotlib.pyplot as plt
+        from matplotlib.ticker import EngFormatter
+        from matplotlib.colors import LogNorm
+        from sklearn.metrics import confusion_matrix, accuracy_score, classification_report
+
+
         test_data = os.path.join(DB, test_data) + ".csv"
         test_data = pd.read_csv(test_data, header=None)
         flags = test_data.iloc[:, -1].copy()

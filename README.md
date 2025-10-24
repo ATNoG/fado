@@ -84,6 +84,8 @@ To check the entries already in the map
    - Attaches to kernel probes to trace syscalls in real-time.  
    - Performs anomaly detection using `--model_file`.  
 
+> **Note:** The performance values presented in the associated document were obtained using a specialized venv with only the __hmmlearn__ lib installed. To allow its use, comment the first 2 lines [here](utils/__init__.py)
+
 
 ## Example Commands
 
