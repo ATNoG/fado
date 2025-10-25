@@ -1,4 +1,3 @@
-from time import sleep
 from collections import defaultdict
 import threading
 from .bcc import BPF

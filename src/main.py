@@ -1,5 +1,3 @@
-from src.simulation import simulate
-from src.trace import trace
 from models import HMM
 import argparse
 
@@ -81,6 +79,7 @@ def main():
     args = parser.parse_args()
     
     if args.scenario != None:
+        from src.simulation import simulate
         simulate(
             scenarioID = args.scenario,
             limit = args.limit,
@@ -104,24 +103,17 @@ def main():
                      n_iter=args.iterations)
 
     if args.train:
-        # if not args.train_data:
-        #     print("Missing train data")
-        #     exit(-1)
-
         print("Train Triggered")
         model.train(args.train)
         if not args.test:
             exit(0)
 
     if args.test:
-        # if not args.test_data:
-        #     print("Missing test data")
-        #     exit(-1)
-
         print("Test Triggered")
         model.test(args.test)
         exit(0)
 
+    from src.trace import trace
     print("Tracing...")
     trace(
         model_file = args.model_file, 
