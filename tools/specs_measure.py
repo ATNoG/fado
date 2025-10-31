@@ -1,50 +1,69 @@
+import statistics
+from math import sqrt
 import sys
 import psutil
-from time import sleep
+from time import monotonic
 
 process_dict = {}
 process = psutil.Process(int(sys.argv[1]))
-prev_time = 0
-avg_cpu_time = 0
-avg_cpu_perc = 0
-avg_mem_use = 0
+name = sys.argv[2]
+prev_time = sum(process.cpu_times()[:2])
+cpu_time = 0
+cpu_pct = []
+mem_use = []
+process.cpu_percent()
+cpu_percent = 0.0
+cpu_elapsed_time = tuple()
+memory_use = 0
+end_time = monotonic() + 120
 counter = 0
 
-while True:
+while monotonic() < end_time:
     try:
         with process.oneshot():
-            process_dict["pcpu"] = process.cpu_percent()
-            process_dict["uss"] = process.memory_full_info()[0] / 1024 ** 2
-            process_dict["pmem"] = process.memory_percent()
-            cpu_time = sum(process.cpu_times()[:2])
-            process_dict["cpu"] = cpu_time - prev_time
-            prev_time = cpu_time
+            cpu_elapsed_time = process.cpu_times()[:2]
+            memory_use = process.memory_info()[0]
 
+        cpu_pct.append(process.cpu_percent(interval=1))
+        now_time = sum(cpu_elapsed_time)
+        cpu_time += max(now_time - prev_time, 0.0)
+        prev_time = now_time
+        mem_use.append(memory_use)
         counter += 1
-        if counter == 1: continue
-        avg_cpu_perc += process_dict["pcpu"]
-        avg_cpu_time += process_dict["cpu"]
-        avg_mem_use += process_dict["uss"]
-        print(f"CPU Time: {process_dict["cpu"]}s")
-        print(f"CPU percentage: {process_dict["pcpu"]}")
-        print(f"Mem usage: {process_dict["uss"]} Mb")
-        print(f"Mem percentage: {process_dict["pmem"]}")
-        if counter >= 61:
-            counter -= 1
-            avg_cpu_perc /= counter
-            avg_cpu_time /= counter
-            avg_mem_use /= counter
-
-            with open("tools/specs.txt", 'a') as f:
-                f.write(f"{sys.argv[2]}\nPCPU, {avg_cpu_perc}\nCPU, {avg_cpu_time}\nMEM, {avg_mem_use}\n")
-            exit()
-        sleep(1)
     except KeyboardInterrupt:
-        counter -= 1
-        avg_cpu_perc /= counter
-        avg_cpu_time /= counter
-        avg_mem_use /= counter
+        print("Interrupted by user.")
+        break
 
-        with open("tools/specs.txt", 'a') as f:
-            f.write(f"{sys.argv[2]}\nPCPU, {avg_cpu_perc}\nCPU, {avg_cpu_time}\nMEM, {avg_mem_use}\n")
-        exit(0)
+def sem(values):
+    return statistics.stdev(values) / sqrt(len(values)) if len(values) > 1 else 0.0
+
+avg_cpu_perc = statistics.fmean(cpu_pct)
+err_cpu_perc = sem(cpu_pct)
+
+avg_mem_use = statistics.fmean(mem_use)
+err_mem_use = sem(mem_use)
+
+avg_cpu_time = cpu_time / counter
+
+with open("tools/performance.txt", "a") as f:
+    f.write(f"\n\n\n{name}\n")
+
+    f.write("=== CPU ===\n")
+    f.write(f"Average CPU %%: {avg_cpu_perc:.2f} ± {err_cpu_perc:.2f}\n")
+    f.write(f"Avg CPU time per second: {avg_cpu_time:.4f} s/s\n\n")
+
+    f.write("=== Memory ===\n")
+    f.write(f"Average RSS: {avg_mem_use / (1024*1024):.2f} MiB ± {err_mem_use / (1024*1024):.2f}\n")
+
+print(f"Summary written")
+
+print(f"\n{name}\n")
+
+print("=== CPU ===\n")
+print(f"Average CPU %%: {avg_cpu_perc:.2f} ± {err_cpu_perc:.2f}\n")
+print(f"Avg CPU time per second: {avg_cpu_time:.4f} s/s\n\n")
+
+print("=== Memory ===\n")
+print(f"Average RSS: {avg_mem_use / (1024*1024):.2f} MiB ± {err_mem_use / (1024*1024):.2f}\n")
+
+print(f"Iterations: {counter}")

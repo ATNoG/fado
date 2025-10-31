@@ -2,11 +2,13 @@ from utils import BaseSimulation, Scenario, ScenarioManager, DB
 from probe import Probe, SysdigProbe
 from multiprocessing import Lock, Process, Event
 from .cleanup_data import cleanup
+from queue import Queue
 import os
 from random import random
 from time import sleep
 
 def monitor_data(
+        scenario:BaseSimulation,
         data_path:str, 
         stop_sim, 
         exploit_flag, 
@@ -17,36 +19,102 @@ def monitor_data(
     
     output = open(data_path, "w")
     counter = 0
+    queue = Queue(maxsize=1000)
+    data = []
+    chance = 0.005
+    triggered_exploit = False
+    flag = 0
     # counters = {}
     # output_list = {}
     # windows = [2, 3, 4, 6, 8, 10]
 
-    # # for i in windows:
-    # #     counters[i] = 0
-    # #     fn = data_path.replace("WSIZE", str(i))
-    # #     output_list[i] = open(fn, 'w')
+    # for i in windows:
+    #     # counters[i] = 0
+    #     fn = data_path.replace("WSIZE", str(i))
+    #     output_list[i] = open(fn, 'w')
 
-    probe = Probe(mntns)
+    probe = Probe(queue, window_size, mntns)
 
     while True: 
+        flag = 0
         if stop_sim.is_set() or (limit and counter >= limit):
         # if stop_sim.is_set():
             if not stop_sim.is_set(): stop_sim.set()
-            while not exploit_flag.is_set():
-                sleep(0.2)
-            data = probe.end_trace()
+            if exploit_flag and not triggered_exploit:
+                scenario.call_exploit()
+                print("Exploit")
+                flag = 1
+            probe.end_trace()
+            data += queue.get(block=True, timeout=1)
+            for sequence in data:
+                    output.write(f"{','.join(map(str, sequence))},{flag}\n")
+            counter += len(data) * window_size
+            # for window in windows:
+            #     output = output_list[window]
+            #     entry = probe.gen_sliding_window(data, window)
+            #     for sequence in entry:
+            #         output.write(f"{','.join(map(str, sequence))},{flag}\n")
+            # data.clear()
+
             if limit > 0: print(f"Limit exceeded by {counter - limit} syscalls")
         else:
-            data = probe.get_data()
+            data += queue.get(block=True)
+            while not queue.empty():
+                data += queue.get_nowait()
+            data.sort(key=lambda e: e[0])
 
-        if data:
-            tid_dict = probe.gen_sliding_window(data, window_size)
-            for _, syscalls in tid_dict.items():
-                counter += len(syscalls)
-                if syscalls == []:
-                    continue
-                for syscall_window in syscalls:
-                    output.write(f"{','.join(map(str, syscall_window))},{0}\n")
+            for sequence in data:
+                    output.write(f"{','.join(map(str, sequence))},{flag}\n")
+            counter += len(data) * window_size
+
+            counter += len(data) * window_size
+
+            if exploit_flag and random() < chance:
+                scenario.call_exploit()
+                chance /= 50
+                triggered_exploit = True
+                print("Exploit")
+                flag = 1
+
+                data += queue.get(block=True)
+                while not queue.empty():
+                    data += queue.get_nowait()
+                data.sort(key=lambda e: e[0])
+
+                for sequence in data:
+                    output.write(f"{','.join(map(str, sequence))},{flag}\n")
+                counter += len(data) * window_size
+
+            # for window in windows:
+            #     output = output_list[window]
+            #     entry_dict = probe.gen_sliding_window(data, window)
+            #     for _, syscalls in entry_dict.items():
+            #         if syscalls == []:
+            #             continue
+            #         for sequence in syscalls:
+            #             output.write(f"{','.join(map(str, sequence))},{flag}\n")
+            #         if window == 10:
+            #             counter += len(syscalls)
+            #     if counter >= 2000000:
+            #         print(counter)
+            #         stop_sim.set()
+            data.clear()
+            # data = probe.get_data()
+
+        # if data:
+            
+
+        #     for sequence in data:
+        #         print(sequence)
+                # exit()
+                # output.write(f"{','.join(map(str, sequence))},{0}\n")
+            # tid_dict = probe.gen_sliding_window(data, window_size)
+            # for _, syscalls in tid_dict.items():
+            #     counter += len(syscalls)
+            #     if syscalls == []:
+            #         continue
+            #     for syscall_window in syscalls:
+            #         output.write(f"{','.join(map(str, syscall_window))},{0}\n")
 
             # new_window = []
             # for i in windows:
@@ -160,39 +228,6 @@ def sysdig_monitor(
         except Exception:
             pass
 
-def gen_exploit(scenario:BaseSimulation, stop_sim, exploit_flag):
-    """
-    Occasionally trigger exploits while simulation is running.
-    Ensures at least one exploit is fired before exit.
-    """
-
-    lock = Lock()
-    counter = 0 
-
-    chance = 0.005
-
-    while not stop_sim.is_set():  # keep going until stop signal
-        # Random chance to fire exploit
-        if random() < chance:
-            with lock:
-                print("Exploiting")
-                scenario.call_exploit()
-            exploit_flag.set()
-            counter += 1
-            chance /= 50
-        sleep(0.5)  # control loop frequency (every 2000ms)
-
-    # Guarantee at least one exploit before stopping
-    if not exploit_flag.is_set():
-        print("Triggering Exploit Before Terminating")
-        with lock:
-            scenario.call_exploit()
-        sleep(5)
-        exploit_flag.set()
-        counter += 1
-    print(f"{counter} exploits")
-
-
 def simulate(
         scenarioID:int, 
         limit:int=None, 
@@ -218,19 +253,8 @@ def simulate(
     data_path = os.path.join(DB, filename.removesuffix(".csv") if filename else scenario.syscallDir + f"_w{window_size}") + ".csv"
 
     stop_sim = Event() 
-    exploit_flag = Event()
 
-    if not exploit:
-        exploit_flag.set()
-    else:
-        exploit_thread = Process(target=gen_exploit, args=(scenario, stop_sim, exploit_flag))
-        exploit_thread.start()
-
-
-    if mntns == "/sys/fs/bpf/mnt_ns_set":
-        probe_thread = Process(target=monitor_data, args=(data_path, stop_sim, exploit_flag, mntns, window_size, limit))
-    else:
-        probe_thread = Process(target=sysdig_monitor, args=(data_path, stop_sim, exploit_flag, mntns, window_size, limit))
+    probe_thread = Process(target=monitor_data, args=(scenario, data_path, stop_sim, exploit, mntns, window_size, limit))
     probe_thread.start()
     
     scenario.simulate(duration, stop_sim, exploit=exploit)
@@ -240,14 +264,13 @@ def simulate(
     probe_thread.join()
 
     if exploit:
-        exploit_thread.join()
-        # for i in [2, 3, 4, 6, 8, 10]:
-        #     bn = baseline.replace("WSIZE", str(i))
-        #     fn = data_path.replace("WSIZE", str(i))
-        if baseline != None:
-            bn += ".csv"
-            bn = os.path.join(DB, bn)
-            cleanup(baseline, data_path)
+        for i in [2, 3, 4, 6, 8, 10]:
+            bn = baseline.replace("WSIZE", str(i))
+            fn = data_path.replace("WSIZE", str(i))
+            if baseline != None:
+                bn += ".csv"
+                bn = os.path.join(DB, bn)   
+                cleanup(bn, fn)
 
 
         

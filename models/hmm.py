@@ -212,20 +212,31 @@ class HMM:
         anom_idx = [i for i, f in enumerate(flags) if f == 1]
 
         # Plot normals first (lighter green)
-        plt.scatter(np.array(norm_idx), np.array(scores)[norm_idx], c='green', s=80, alpha=0.4, label='Normal')
+        # plt.scatter(np.array(norm_idx), np.array(scores)[norm_idx], c='green', s=80, alpha=0.4, label='Normal')
 
-        # Plot anomalies second (opaque red, top layer)
-        plt.scatter(np.array(anom_idx), np.array(scores)[anom_idx], c='red', s=120, alpha=0.9, label='Anomalous')
+        # # Plot anomalies second (opaque red, top layer)
+        # plt.scatter(np.array(anom_idx), np.array(scores)[anom_idx], c='red', s=120, alpha=0.9, label='Anomalous')
 
-        plt.axhline(y=self.threshold, color='blue', linestyle='dashed', label="Threshold")
+        plt.scatter(np.array(norm_idx), np.array(scores)[norm_idx],
+                    c='green', s=80, alpha=0.4, label='Normal Sequence', zorder=1)
+
+        # 2) Anomalies (opaque red)
+        plt.scatter(np.array(anom_idx), np.array(scores)[anom_idx],
+                    c='red', s=120, alpha=0.9, label='Anomalous Sequence', zorder=2)
+
+        plt.axhline(y=self.threshold, color='blue', linestyle='dashed', linewidth=4, label="Threshold")
         plt.xlabel("Sequence Index")
         plt.ylabel("Log-Likelihood Score")
         ax = plt.gca()
         ax.xaxis.set_major_formatter(EngFormatter())
         ax.margins(x=0, y=0)
 
+        handles, labels = ax.get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        ax.legend(by_label.values(), by_label.keys(), loc='lower right', framealpha=0.9)
+
         plt.savefig(
-            os.path.join(FIGS, f"{self.name}_log_likelihood_8.png"),
+            os.path.join(FIGS, f"{self.name}_log_likelihood.png"),
             bbox_inches="tight",
             pad_inches=0)
         
@@ -248,16 +259,16 @@ class HMM:
         # --- Plot ---
         # 1) True normals (lighter green)
         plt.scatter(norm_idx, sc[norm_idx],
-                    c='green', s=80, alpha=0.4, label='Normal', zorder=1)
+                    c='green', s=80, alpha=0.4, label='Normal Sequence', zorder=1)
 
         # 2) Anomalies (opaque red)
-        plt.scatter(fn_idx, sc[fn_idx],
-                    c='red', s=120, alpha=0.9, label='Anomalous', zorder=2)
+        plt.scatter(anom_idx, sc[anom_idx],
+                    c='red', s=120, alpha=0.9, label='Anomalous Sequence', zorder=2)
 
-        # 3) Missed sequences (false negatives) — make them stand out
-        plt.scatter(true_anom_idx, sc[true_anom_idx],
-                    c='orange', s=140, alpha=0.95, marker='x', linewidths=2,
-                    label='Missed Sequences', zorder=3)
+        # # 3) Missed sequences (false negatives) — make them stand out
+        # plt.scatter(true_anom_idx, sc[true_anom_idx],
+        #             c='orange', s=140, alpha=0.95, marker='x', linewidths=2,
+        #             label='Missed Sequence', zorder=3)
 
         # Threshold line
         plt.axhline(y=self.threshold, color='blue', linestyle='dashed', linewidth=4, label="Threshold")
@@ -280,7 +291,8 @@ class HMM:
         plt.savefig(
             os.path.join(FIGS, f"tolerant_{self.name}_log_likelihood.png"),
             bbox_inches="tight",
-            pad_inches=0
+            pad_inches=0,
+            dpi=500
         )
 
         avg_pred_time = (avg / counter) / 1e6

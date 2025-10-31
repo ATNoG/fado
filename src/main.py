@@ -1,4 +1,3 @@
-from models import HMM
 import argparse
 
 def main():
@@ -67,19 +66,11 @@ def main():
     parser.add_argument("-b", "--baseline",
             help="Path to baseline dataset.",
             type=str)
-    # parser.add_argument("-s", "--simulation",
-    #         help="Enable simulation mode.",
-    #         action=argparse.BooleanOptionalAction)
-    # parser.add_argument("-t", "--train",
-    #         help="Train Prediction Model",
-    #         action=argparse.BooleanOptionalAction)
-    # parser.add_argument("--test",
-    #         help="Test Prediction Model",
-    #         action=argparse.BooleanOptionalAction)
     args = parser.parse_args()
     
     if args.scenario != None:
         from src.simulation import simulate
+        
         simulate(
             scenarioID = args.scenario,
             limit = args.limit,
@@ -98,6 +89,7 @@ def main():
         exit(-1)
 
     if args.train or args.test:
+        from models import HMM
         model = HMM(args.model_file,
                      n_components=args.states,
                      n_iter=args.iterations)
