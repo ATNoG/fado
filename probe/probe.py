@@ -65,6 +65,7 @@ class  Probe:
     def monitor(self):
         b = defaultdict(list)
 
+        ## UNUSED
         def handle_e(cpu, data, size):
             event = self.bpf["events"].event(data)
             self.queue.put([[event.ts, event.tid, event.sid]])

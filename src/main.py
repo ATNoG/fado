@@ -19,14 +19,6 @@ def main():
         help="Maximum number of syscalls to trace before stopping (0 = no limit).",
         default=0,
         type=int)
-    # parser.add_argument("-tol", "--tolerance",
-    #     help="Classification tolerance threshold (default: 0.6).",
-    #     default=0.6,
-    #     type=float)
-    # parser.add_argument("-g", "--generalization",
-    #     help="Abstract most frequent sequences (default: 0.02).",
-    #     default=0.02,
-    #     type=float)
     parser.add_argument("-e", "--exploit",
         help="Trigger exploit during simulation (default: disabled).",
         default=False,
