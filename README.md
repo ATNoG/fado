@@ -69,14 +69,14 @@ To check the entries already in the map
 
 2. **Model Training (`--train`)**  
    - Requires `--model_file` (where to save/load the model).  
-   - Requires `train_data`.  
+   - Requires train data file `--train`.  
    - Builds an HMM with parameters:  
      - Hidden states: `--states`  
      - Iterations: `--iterations`  
    - Saves the trained model to `--model_file`.  
 
 3. **Model Testing (`--test`)**  
-   - Requires `--model_file` and `test_data`.  
+   - Requires `--model_file` and `--test`.  
    - Loads the HMM from file.  
 
 4. **Live Tracing (default fallback)**  
@@ -102,7 +102,7 @@ sudo venv/bin/python3 -m src.main \
 ### Train Model
 ```
 sudo venv/bin/python3 -m src.main -m hmm \
-    -t data/logs/train.csv \       # Enable training mode
+    -t train_data \                # Enable training mode
     --states 100 \                 # Number of hidden states
     --iterations 200               # Training iterations
 ```
@@ -110,7 +110,7 @@ sudo venv/bin/python3 -m src.main -m hmm \
 ### Test Model
 ```
 sudo venv/bin/python3 -m src.main -m hmm \
-    --test data/logs/test.csv \     # Enable test mode
+    --test test_data \     # Enable test mode
 ```
 
 ### Dynamic Anomaly Detection 
