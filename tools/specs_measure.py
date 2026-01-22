@@ -24,7 +24,9 @@ while monotonic() < end_time:
             cpu_elapsed_time = process.cpu_times()[:2]
             memory_use = process.memory_info()[0]
 
-        cpu_pct.append(process.cpu_percent(interval=1))
+        k = process.cpu_percent(interval=1)
+        print(k)
+        cpu_pct.append(k)
         now_time = sum(cpu_elapsed_time)
         cpu_time += max(now_time - prev_time, 0.0)
         prev_time = now_time
@@ -45,15 +47,31 @@ err_mem_use = sem(mem_use)
 
 avg_cpu_time = cpu_time / counter
 
+cpu_sorted = sorted(cpu_pct)
+n = len(cpu_sorted)
+
+def percentile(p):
+    k = (n - 1) * p
+    f = int(k)
+    c = min(f + 1, n - 1)
+    return cpu_sorted[f] + (cpu_sorted[c] - cpu_sorted[f]) * (k - f)
+
 with open("tools/performance.txt", "a") as f:
-    f.write(f"\n\n\n{name}\n")
+    f.write("\n=== CPU Box Plot Data ===\n")
+    f.write(f"Min: {cpu_sorted[0]:.2f}\n")
+    f.write(f"Q1: {percentile(0.25):.2f}\n")
+    f.write(f"Median: {percentile(0.50):.2f}\n")
+    f.write(f"Q3: {percentile(0.75):.2f}\n")
+    f.write(f"Max: {cpu_sorted[-1]:.2f}\n")
+    f.write(f"Samples: {n}\n")
+    # f.write(f"\n\n\n{name}\n")
 
-    f.write("=== CPU ===\n")
-    f.write(f"Average CPU %%: {avg_cpu_perc:.2f} ± {err_cpu_perc:.2f}\n")
-    f.write(f"Avg CPU time per second: {avg_cpu_time:.4f} s/s\n\n")
+    # f.write("=== CPU ===\n")
+    # f.write(f"Average CPU %%: {avg_cpu_perc:.2f} ± {err_cpu_perc:.2f}\n")
+    # f.write(f"Avg CPU time per second: {avg_cpu_time:.4f} s/s\n\n")
 
-    f.write("=== Memory ===\n")
-    f.write(f"Average RSS: {avg_mem_use / (1024*1024):.2f} MiB ± {err_mem_use / (1024*1024):.2f}\n")
+    # f.write("=== Memory ===\n")
+    # f.write(f"Average RSS: {avg_mem_use / (1024*1024):.2f} MiB ± {err_mem_use / (1024*1024):.2f}\n")
 
 print(f"Summary written")
 

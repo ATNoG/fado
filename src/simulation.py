@@ -1,11 +1,95 @@
 from utils import BaseSimulation, Scenario, ScenarioManager, DB
-from probe import Probe
+from probe import Probe, SysdigProbe
 from multiprocessing import Process, Event
 from .cleanup_data import cleanup
 from queue import Queue
 import os
 from random import random
 from time import sleep
+
+def sysdig_monitor(
+        scenario: BaseSimulation,
+        data_path: str,
+        stop_sim,          # threading.Event
+        exploit_flag,      # threading.Event
+        mntns: str,        # here: container_id or unique prefix for SysdigProbe
+        window_size: int,  # unused (kept for signature compatibility)
+        limit: int
+    ):
+    """
+    Stream raw sysdig events to CSV as they are traced (no sliding window).
+
+    CSV columns (no header):
+      ts, container_id, container_name, pid, tid, evt_type, evt_args, 0
+    """
+
+    # Treat mntns as the target container ID/prefix for SysdigProbe
+    container_id = mntns
+
+    # Start probe (this SysdigProbe version already filters on container_id and ignores futex)
+    probe = SysdigProbe(container_id=container_id)
+
+    # Open output file (line-buffered via newline='' + csv.writer)
+    writer = open(data_path, "w", newline="")
+    # writer = csv.writer(f)
+
+    counter = 0  # number of events written
+
+    def write_batch(events):
+        nonlocal counter
+        if not events:
+            return 0
+        written = 0
+        # If limit is set, only write up to the remaining budget
+        remaining = (limit - counter) if limit else None
+        for e in (events if remaining is None else events[:max(0, remaining)]):
+            writer.write(e + "\n")
+            # ts, cid, cname, pid, tid, evtype, evargs = e
+            # writer.writerow([ts, cid, cname, pid, tid, evtype, evargs, 0])
+            written += 1
+        counter += written
+        return written
+
+    probe.start()
+    try:
+        while True:
+            # Stop conditions
+            if stop_sim.is_set() or (limit and counter >= limit):
+                if not stop_sim.is_set():
+                    stop_sim.set()
+
+                # Stop probe and flush remaining events (respect limit)
+                remaining_events = probe.stop()
+
+                if limit and counter < limit:
+                    # write only up to limit
+                    write_batch(remaining_events)
+                elif not limit:
+                    write_batch(remaining_events)
+
+                if limit > 0 and counter > limit:
+                    print(f"Limit exceeded by {counter - limit} events")
+
+            else:
+                batch = probe.get_data()
+                write_batch(batch)
+
+            if stop_sim.is_set():
+                print("Ending trace")
+                writer.close()
+                return
+            sleep(0.5)
+    finally:
+        # Best-effort cleanup if something goes wrong
+        try:
+            probe.stop()
+        except Exception:
+            pass
+        try:
+            writer.close()
+        except Exception:
+            pass
+
 
 def monitor_data(
         scenario:BaseSimulation,
@@ -84,6 +168,7 @@ def simulate(
         window_size=3,
         baseline:str=None,
         filename:str=None,
+        dataset:bool=False
         ):
     
     if not (duration or limit): 
@@ -101,7 +186,10 @@ def simulate(
 
     stop_sim = Event() 
 
-    probe_thread = Process(target=monitor_data, args=(scenario, data_path, stop_sim, exploit, mntns, window_size, limit))
+    if dataset:
+        probe_thread = Process(target=sysdig_monitor, args=(scenario, data_path, stop_sim, exploit, mntns, window_size, limit))
+    else:
+        probe_thread = Process(target=monitor_data, args=(scenario, data_path, stop_sim, exploit, mntns, window_size, limit))
     probe_thread.start()
     
     scenario.simulate(duration, stop_sim, exploit=exploit)
@@ -114,9 +202,3 @@ def simulate(
         if baseline != None:
             baseline_path = os.path.join(DB, filename.removesuffix(".csv")) + ".csv"
             cleanup(baseline_path, data_path)
-
-
-        
-    
-
-

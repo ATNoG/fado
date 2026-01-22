@@ -72,6 +72,7 @@ def main():
             window_size = args.window_size,
             baseline = args.baseline,
             filename = args.filename,
+            dataset = True
         )
         if not (args.train or args.test):
             exit()
