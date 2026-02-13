@@ -1,0 +1,14 @@
+cff-version: 1.0.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: Durval
+  given-names: Pedro
+  orcid: https://orcid.org/0009-0003-9230-1483
+- family-names: Escaleira
+  given-names: Pedro
+  orcid: https://orcid.org/0000-0001-9080-6080
+title: Function-level Anomaly Detection Observer (FADO)
+version: noms2025-paper
+date-released: 2026-01-23
+doi: 10.5281/zenodo.18354516 
+url: "https://github.com/ATNoG/fado"
