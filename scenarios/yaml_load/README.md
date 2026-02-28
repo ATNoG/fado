@@ -6,7 +6,7 @@ Adapted from [here](https://github.com/we45/DVFaaS-Damn-Vulnerable-Functions-as-
 
 ## SETUP
 
-```
+```bash
 cd src/backend/
 docker build -t yaml_load .
 docker run -p 8000:8000 -v /host/shared:/shared yaml_load
@@ -14,13 +14,13 @@ docker run -p 8000:8000 -v /host/shared:/shared yaml_load
 Exposes port 8000
 
 ## Malicious Payload
-```
+```bash
 curl -X POST http://127.0.0.1:8000/yaml_upload/test@exploit.com -F 'file=@exploit.yml'
 ```
 
 ## To run Frontend interface
 
-```
+```bash
 cd src/frontend/
 npm run dev
 ```

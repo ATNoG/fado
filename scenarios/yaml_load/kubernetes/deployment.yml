@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yaml-load-deployment
+  labels:
+    app: yaml-load
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: yaml-load
+  template:
+    metadata:
+      labels:
+        app: yaml-load
+    spec:
+      containers:
+        - name: yaml-load
+          image: yaml_load:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
