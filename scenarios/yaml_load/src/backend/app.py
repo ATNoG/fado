@@ -1,12 +1,8 @@
 from chalice import Chalice
-import yaml
 from io import BytesIO
-import cgi
-import os
-from time import sleep, time
+import yaml, cgi
 
 app = Chalice(app_name='dvfaas-insecure-deserialization')
-
 
 def _get_parts():
     rfile = BytesIO(app.current_request.raw_body)
@@ -15,23 +11,6 @@ def _get_parts():
     parameters['boundary'] = parameters['boundary'].encode('utf-8')
     parsed = cgi.parse_multipart(rfile, parameters)
     return parsed
-
-
-def anomaly_detected():
-    signal_dir = '/shared'
-    stime = time()
-    while time() - stime < 1:
-        try:
-            files = os.listdir(signal_dir)
-        except FileNotFoundError:
-            files = []
-        if 'anomalous' in files:
-            file = signal_dir + "/anomalous"
-            os.remove(file)
-            return True
-        sleep(0.01)
-    return False
-
 
 @app.route('/test')
 def test_route():
