@@ -1,18 +1,13 @@
-from matplotlib.ticker import PercentFormatter
-from utils import DB
-import os
-from probe.bcc.syscall import syscalls
 from collections import Counter
+from utils import DB
 import pandas as pd
-import sys
-import matplotlib.pyplot as plt
+import os
 
 # --- Read and preprocess data ---
 
 windows = [2, 3, 4, 6, 8, 10]
 scenarios = ["baseline_Log4Shell_", "baseline_SentimentAnalyzer_", "baseline_YamlLoad_"]
 entropies = {s.split("_")[1]: [] for s in scenarios} 
-
 
 for scenario in scenarios:
     avg_remaining = 0
@@ -43,9 +38,9 @@ for scenario in scenarios:
         avg_remaining += percent_remaining_10
 
         print(f"Data remaining after removing sequences >10% frequency: {remaining_10} rows ({percent_remaining_10:.2f}%)")
-    
+
     entropies[scenario.split("_")[1]].append(avg_remaining/len(windows))
-        
+
 for k, v in entropies.items():
     print(k)
     print(v)

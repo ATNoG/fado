@@ -1,14 +1,10 @@
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 import seaborn as sns
-from matplotlib.colors import LogNorm
+import pandas as pd
 
 # --- Load CSV ---
 df = pd.read_csv("tools/s4s_ait.csv")
 df = df.set_index("GramSize")
-
 
 plt.figure(figsize=(10, 8))
 plt.rcParams.update({'font.size': 23})
@@ -20,10 +16,7 @@ plt.ylabel("Sequence Size")
 plt.tight_layout()
 plt.margins(0)  # remove margins around data
 
-
-plt.savefig("s4s_ait_heatmap.pdf", dpi=200,bbox_inches='tight', 
-            pad_inches=0)
-
+plt.savefig("s4s_ait_heatmap.pdf", dpi=200,bbox_inches='tight', pad_inches=0)
 
 # sns.heatmap(
 #     df,

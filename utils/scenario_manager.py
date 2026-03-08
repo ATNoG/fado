@@ -1,7 +1,6 @@
 from scenarios import yaml_load, sentiment_analyzer, log4shell
-from enum import Enum
 from .abstract_scenario import BaseSimulation
-
+from enum import Enum
 
 class Scenario(Enum):
     YAML_LOAD = 0

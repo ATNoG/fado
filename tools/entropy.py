@@ -1,10 +1,8 @@
-from utils import DB
-import sys
-import glob
-import pandas as pd
-import numpy as np
 from collections import Counter
 import matplotlib.pyplot as plt
+from utils import DB
+import pandas as pd
+import numpy as np
 import os
 
 csv_files = ["baseline_Log4Shell_3", "baseline_Log4Shell_4", "baseline_Log4Shell_10"]
@@ -37,11 +35,13 @@ for scenario in scenarios:
         all_freqs[name] = rel_freqs
 
 entropies["SentimentAnalyzer"] = [4.464393104, 4.5550405, 4.621421, 4.782818, 4.950117, 5.121028]
+
 # Tabulate for quick inspection
 entropy_table = pd.DataFrame(entropies, index=windows)
 print("\nEntropy by scenario and window:")
 print(entropy_table)
 scenarios.append("d_SentimentAnalyzer")
+
 # Plot
 plt.figure(figsize=(14, 8))
 plt.rcParams.update({'font.size': 23})
@@ -59,5 +59,4 @@ plt.margins(0)  # remove margins around data
 
 # Save and/or show
 out_png =  "entropy_by_scenario.png"
-plt.savefig(out_png, dpi=200,bbox_inches='tight', 
-            pad_inches=0)
+plt.savefig(out_png, dpi=200,bbox_inches='tight', pad_inches=0)

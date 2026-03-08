@@ -1,8 +1,8 @@
+import matplotlib.pyplot as plt
 from utils import DB
-import os
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+import os
 
 windows = [2, 3, 4, 6, 8, 10]
 scenarios = [
@@ -60,7 +60,6 @@ dissim_df = pd.DataFrame(dissimilarity, index=windows)
 print("\nDissimilarity (fraction of baseline missing in train):")
 print(dissim_df)
 
-
 # Plot
 plt.figure(figsize=(14, 8))
 plt.rcParams.update({'font.size': 23})
@@ -76,6 +75,4 @@ plt.legend(title="Scenario")
 plt.tight_layout()
 plt.margins(0)  # remove margins around data
 
-
-plt.savefig("baseline_train_dissimilarity.pdf", dpi=200,bbox_inches='tight', 
-            pad_inches=0)
+plt.savefig("baseline_train_dissimilarity.pdf", dpi=200,bbox_inches='tight', pad_inches=0)

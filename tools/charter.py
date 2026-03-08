@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import pandas as pd
-import sys
-import os
+import sys, os
 
 # Read CSV (replace with your actual path)
 filename = sys.argv[1]

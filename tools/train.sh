@@ -20,7 +20,6 @@ STATES_LIST=(10 50 30 5)
 
 echo "=== Starting model evaluation in parallel ${MAX_JOBS} ==="
 
-
 for NAME in "${NAMES[@]}"; do
     for W in "${W_LIST[@]}"; do
         for STATES in "${STATES_LIST[@]}"; do

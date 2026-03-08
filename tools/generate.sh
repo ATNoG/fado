@@ -31,7 +31,6 @@ shift 2  # "$@" now holds all W values
 #     sudo venv/bin/python3 -m src.cleanup_data new_data/logs/baseline_${NAME}_${W}.csv new_data/logs/${NAME}_${W}_test_v2.csv
 # done
 
-
 # Wait for all background jobs to finish
 wait
 

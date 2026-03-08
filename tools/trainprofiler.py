@@ -1,7 +1,5 @@
-from matplotlib.ticker import PercentFormatter
-import pandas as pd
 import matplotlib.pyplot as plt
-
+import pandas as pd
 
 # --- Plot ---
 df = pd.read_csv("tools/train_profile.csv", header=None, names=["value"])
@@ -18,7 +16,6 @@ plt.yscale("log")  # <- logarithmic y-axis
 plt.grid(True, linestyle='--', alpha=0.6)
 plt.tight_layout()
 plt.margins(0)  # remove margins around data
-
 
 # Save & show
 plt.savefig("train_profile.pdf", dpi=200, bbox_inches='tight', pad_inches=0)

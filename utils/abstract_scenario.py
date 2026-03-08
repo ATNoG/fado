@@ -1,8 +1,7 @@
-import random
-from time import time
-import aiohttp
 from abc import ABC, abstractmethod
-import asyncio
+import aiohttp, asyncio
+from time import time
+import random
 
 class BaseSimulation(ABC):
     def __init__(self):
@@ -28,11 +27,7 @@ class BaseSimulation(ABC):
         connector = aiohttp.TCPConnector(limit=0, force_close=True)
         concurrency = random.randint(1,50) if not exploit else random.randint(20,150)
 
-        async with aiohttp.ClientSession(
-            connector=connector,
-            timeout=aiohttp.ClientTimeout(total=10),
-            auto_decompress=True
-        ) as session:
+        async with aiohttp.ClientSession(connector=connector, timeout=aiohttp.ClientTimeout(total=10), auto_decompress=True) as session:
             start_time = time()
             if stop_time:
                 while time() < stop_time:
@@ -63,7 +58,7 @@ class BaseSimulation(ABC):
                     print(f"\rActive: {len(tasks)} | Elapsed: {elapsed}s ")
                     concurrency = random.randint(1,50) if not exploit else random.randint(20,150)
                     await asyncio.gather(*tasks, return_exceptions=True)
-        
+
     @abstractmethod 
     async def worker(self, session):
         pass
@@ -71,7 +66,7 @@ class BaseSimulation(ABC):
     @abstractmethod 
     def call_exploit(self):
         pass
-        
+
     @abstractmethod
     def get_data_dir(self) -> str:
         pass

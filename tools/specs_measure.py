@@ -1,8 +1,6 @@
-import statistics
-from math import sqrt
-import sys
-import psutil
+import sys, psutil, statistics
 from time import monotonic
+from math import sqrt
 
 process_dict = {}
 process = psutil.Process(int(sys.argv[1]))

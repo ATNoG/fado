@@ -1,9 +1,8 @@
-from queue import Queue
-from time import sleep
-from collections import defaultdict, Counter
-import threading
-from .bcc import BPF
 from .bcc.containers import filter_by_containers
+from collections import defaultdict
+from queue import Queue
+from .bcc import BPF
+import threading
 
 bpf_program = """
 struct syscall_data{
@@ -15,13 +14,11 @@ struct syscall_data{
 BPF_RINGBUF_OUTPUT(events, 1 << 12);  // 4KB ring buffer
 
 TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
-
     if (container_should_be_filtered()) {
         return 0;
     }
 
     u32 key = args->id;
-
     if (key > 334) {
         key = 335;
     }
@@ -29,7 +26,7 @@ TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
     if (key == 202) {
         return 0;
     }
-    
+
     struct syscall_data sdata = {};
     sdata.ts  = bpf_ktime_get_ns();
     sdata.tid = bpf_get_current_pid_tgid();
@@ -37,8 +34,6 @@ TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
     u64 ts = bpf_ktime_get_ns();
 
     events.ringbuf_output(&sdata, sizeof(sdata), 0);
-
-
     return 0;   
 }
 """
@@ -49,9 +44,8 @@ class ContainerFilter:
         self.cgroupmap = None
 
 class  Probe:
-    def __init__(self, queue:Queue, window_size, mntnsmap):
-        self.htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',
-        b'map_lookup_and_delete_batch') == 1 else False
+    def __init__(self, queue: Queue, window_size, mntnsmap: str):
+        self.htab_batch_ops = BPF.kernel_struct_has_field(b'bpf_map_ops', b'map_lookup_and_delete_batch') == 1
         args = ContainerFilter(mntnsmap)
         bpf = filter_by_containers(args) + bpf_program
         self.bpf = BPF(text=bpf)
@@ -65,7 +59,7 @@ class  Probe:
     def monitor(self):
         b = defaultdict(list)
 
-        ## UNUSED
+        # TODO: this is unused so, remove it
         def handle_e(cpu, data, size):
             event = self.bpf["events"].event(data)
             self.queue.put([[event.ts, event.tid, event.sid]])
@@ -88,25 +82,21 @@ class  Probe:
             # blocks until events arrive, then triggers handle_event()
             self.bpf.ring_buffer_poll()
 
-    
     def end_trace(self):
-        self.bpf.detach_tracepoint("raw_syscalls:sys_exit")
+        self.bpf.detach_tracepoint(b"raw_syscalls:sys_exit")
 
     def gen_sliding_window(self, data, window_size):
         grouped = defaultdict(list)
         for ts, tid, sid in data:
             grouped[tid].append(sid)
+
         threads = {}
         for tid, syscalls in grouped.items():
-            grouped_syscalls = [
-                syscalls[i:i + window_size]
-                for i in range(0, len(syscalls) - window_size + 1)
-            ]
+            grouped_syscalls = [syscalls[i:i + window_size] for i in range(0, len(syscalls) - window_size + 1)]
             threads[tid] = grouped_syscalls
+
         grouped.clear()
         return threads
-
-
 
 def get_data(b, flag=0):
     entry = [f"{k.value},{v.value},{flag}" for k, v in sorted(b["syscalls"].items_lookup_and_delete_batch(), key=lambda kv: kv[0].value)]
@@ -118,5 +108,6 @@ def trace(mntnsmap):
     b = BPF(text=bpf)
     return b
 
+# TODO: is this even used??
 def end_trace(b):
     b.detach_tracepoint("raw_syscalls:sys_exit")

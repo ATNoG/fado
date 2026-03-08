@@ -1,9 +1,6 @@
-import subprocess
-import threading
-import time
+import subprocess, threading, time
 
 class SysdigProbe:
-
     def __init__(self, container_id: str, sysdig_path: str = 'sysdig', extra_filter: str | None = None):
         if not container_id:
             raise ValueError("container_id must be a non-empty string")

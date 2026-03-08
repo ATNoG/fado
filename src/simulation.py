@@ -1,22 +1,14 @@
 from utils import BaseSimulation, Scenario, ScenarioManager, DB
-from probe import Probe
 from multiprocessing import Process, Event
 from .cleanup_data import cleanup
-from queue import Queue
-import os
 from random import random
+from probe import Probe
+from queue import Queue
 from time import sleep
+from sys import exit
+import os
 
-def monitor_data(
-        scenario:BaseSimulation,
-        data_path:str, 
-        stop_sim, 
-        exploit_flag, 
-        mntns:str, 
-        window_size:int, 
-        limit:int
-        ):
-    
+def monitor_data(scenario: BaseSimulation, data_path: str, stop_sim, exploit_flag, mntns: str, window_size:int, limit: int):
     output = open(data_path, "w")
     counter = 0
     queue = Queue(maxsize=1000)
@@ -75,23 +67,16 @@ def monitor_data(
             return
         sleep(0.5)
 
-def simulate(
-        scenarioID:int, 
-        limit:int=None, 
-        duration:int=None, 
-        exploit:bool=False, 
-        mntns:str="/sys/fs/bpf/mnt_ns_set", 
-        window_size=3,
-        baseline:str=None,
-        filename:str=None,
-        ):
-    
+def simulate(scenarioID: int, limit: int=None, duration: int=None, exploit: bool=False, mntns:str="/sys/fs/bpf/mnt_ns_set",
+             window_size=3, baseline: str=None, filename: str=None):
+
     if not (duration or limit): 
         print("Undifined duration")
         exit(-1)
-    
+
     scenario = ScenarioManager().get_scenario(Scenario(scenarioID))
-    if exploit: scenario.is_exploit()
+    if exploit:
+        scenario.is_exploit()
 
     print("*" * 116 + "\n" +
           f"Simulating {scenario.name}, with {"exploit " if exploit else "no exploit "}{f"for {duration} seconds " if duration else ""}{f"until {limit} syscalls" if limit else ""}\n" +
@@ -103,20 +88,14 @@ def simulate(
 
     probe_thread = Process(target=monitor_data, args=(scenario, data_path, stop_sim, exploit, mntns, window_size, limit))
     probe_thread.start()
-    
+
     scenario.simulate(duration, stop_sim, exploit=exploit)
     if not stop_sim.is_set():
         stop_sim.set()
-    
+
     probe_thread.join()
 
     if exploit:
         if baseline != None:
             baseline_path = os.path.join(DB, filename.removesuffix(".csv")) + ".csv"
             cleanup(baseline_path, data_path)
-
-
-        
-    
-
-

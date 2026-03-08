@@ -1,8 +1,6 @@
-import sys
-from collections import Counter
+import sys, matplotlib.pyplot as plt, pandas as pd
 from probe.bcc.syscall import syscalls
-import pandas as pd
-import matplotlib.pyplot as plt
+from collections import Counter
 
 if len(sys.argv) < 2:
     print("Usage: python script.py <data.csv>")
@@ -23,7 +21,6 @@ total = len(rows)
 
 # --- Compute relative frequencies ---
 relative_freqs = {seq: count / total for seq, count in counter.items()}
-
 
 # Get 10 most common
 top10 = counter.most_common(30)

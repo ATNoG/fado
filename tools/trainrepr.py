@@ -1,11 +1,9 @@
-import sys
 import pandas as pd
+import sys
 
 if len(sys.argv) < 3:
     print("Usage: python diff_unique.py <baseline.csv> <test.csv>")
     sys.exit(1)
-
-
 
     ## AVERAGE THE PERCENTAGE FOR ALL SCENARIOS AND DO THIS FOR EVERY WINDOW SIZE
 
