@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Usage: sudo ./generate [NUM] [NAME]
 # Example: sudo ./generate 8 test
 

@@ -6,11 +6,11 @@ from probe import Probe
 from pickle import load
 import os
 
-def trace(model_file: str, mntns: str = "/sys/fs/bpf/mnt_ns_set"):
+def trace(model_file: str, mntns: str):
     model_file = os.path.join(FILES, model_file) + ".pkl"
     queue = Queue(maxsize=1000)
-    print(os.getpid())
 
+    # load the model
     with open(model_file, 'rb') as f:
         saved_data = load(f)
         model = saved_data['model']
@@ -51,4 +51,4 @@ def trace(model_file: str, mntns: str = "/sys/fs/bpf/mnt_ns_set"):
 
 if __name__ == "__main__":
     import sys
-    trace(sys.argv[1])
+    trace(sys.argv[1], "/sys/fs/bpf/mnt_ns_set")

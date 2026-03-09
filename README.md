@@ -4,14 +4,12 @@ FADO is a framework designed to perform fine-grained anomaly detection in server
 
 FADO is tested in multiple real-world scenarios provided under the [scenarios](./scenarios/) folder.
 
-
 ## Getting Started 
 
 ### Prerequisites
-```
+```bash
 python -m venv fado_env
 source fado_env/bin/activate
-
 pip install -r requirements.txt
 ```
 >**Follow the BCC install described [here](https://github.com/iovisor/bcc/blob/master/INSTALL.md#ubuntu---source)**
@@ -29,19 +27,20 @@ At runtime, the tracing logic will filter syscalls so that **only the ones match
 > The framework supports **only one container at a time**. Every time you launch a new container, you must manually update the map with the namespace ID of that container and stop or remove the previous one. Otherwise, syscalls from the new container will not be captured.  
 
 ### Setup Instructions
-This script can be used to tell FADO the container namespace to trace. It automatically passes the one corresponding to the firts container ID it finds, to specify it set the CONTAINERID accordingly.
+This script can be used to tell FADO the container namespace to trace. It automatically passes the one corresponding to the first container ID it finds, to specify it set the CONTAINERID accordingly.
 
 > ⚠️ **Launch the container to be traced prior to this setup**
 
-```
-sudo bpftool map create /sys/fs/bpf/mnt_ns_set type hash key 8 value 4 entries 128 \
-        name mnt_ns_set flags 0
+> This script is available as `setup.sh`.
+
+```bash
+sudo bpftool map create /sys/fs/bpf/mnt_ns_set type hash key 8 value 4 entries 128 name mnt_ns_set flags 0
 
 FILE=/sys/fs/bpf/mnt_ns_set
 if [ $(printf '\1' | od -dAn) -eq 1 ]; then
- HOST_ENDIAN_CMD=tac
+    HOST_ENDIAN_CMD=tac
 else
-  HOST_ENDIAN_CMD=cat
+    HOST_ENDIAN_CMD=cat
 fi
 
 # ENTER MANUALLY IF MORE THAN ONE CONTAINER ACTIVE
@@ -49,14 +48,12 @@ CONTAINERID="$(docker ps -q | head -n 1)"
 
 NS_ID_HEX="$(printf '%016x' $(sudo stat -Lc '%i' /proc/$(docker inspect --format '{{.State.Pid}}' $CONTAINERID)/ns/mnt) | sed 's/.\{2\}/&\n/g' | $HOST_ENDIAN_CMD)"
 sudo bpftool map update pinned $FILE key hex $NS_ID_HEX value hex 00 00 00 00 any
-
 ```
 
 To check the entries already in the map
+```bash
+sudo bpftool map dump pinned /sys/fs/bpf/mnt_ns_set
 ```
- sudo bpftool map dump pinned /sys/fs/bpf/mnt_ns_set
-```
-
 
 ## Execution Flow
 
@@ -86,11 +83,10 @@ To check the entries already in the map
 
 > **Note:** The performance values presented in the associated document were obtained using a specialized venv with only the __hmmlearn__ lib installed. To allow its use, comment the first 2 lines [here](utils/__init__.py)
 
-
 ## Example Commands
 
 ### Run a Simulation
-```
+```bash
 sudo venv/bin/python3 -m src.main \
     -sc 1 \                       # Scenario ID
     -d 60 \                       # Duration in seconds
@@ -100,7 +96,7 @@ sudo venv/bin/python3 -m src.main \
 ```
 
 ### Train Model
-```
+```bash
 sudo venv/bin/python3 -m src.main -m hmm \
     -t train_data \                # Enable training mode
     --states 100 \                 # Number of hidden states
@@ -108,13 +104,13 @@ sudo venv/bin/python3 -m src.main -m hmm \
 ```
 
 ### Test Model
-```
+```bash
 sudo venv/bin/python3 -m src.main -m hmm \
     --test test_data \     # Enable test mode
 ```
 
 ### Dynamic Anomaly Detection 
-```
+```bash
 sudo venv/bin/python3 -m src.main -m hmm
 ```
 
