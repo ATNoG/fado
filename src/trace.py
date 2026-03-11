@@ -8,7 +8,6 @@ import os
 
 def trace(model_file: str, mntns: str):
     model_file = os.path.join(FILES, model_file) + ".pkl"
-    queue = Queue(maxsize=1000)
 
     # load the model
     with open(model_file, 'rb') as f:
@@ -18,6 +17,7 @@ def trace(model_file: str, mntns: str):
         window_size = saved_data['window_size']
         whitelist = saved_data['whitelist']
 
+    queue = Queue(maxsize=1000)
     probe = Probe(queue, window_size, mntns)
     results = deque([0] * 10, maxlen=10)
     data = []

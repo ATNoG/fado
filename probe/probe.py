@@ -34,17 +34,17 @@ TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
     u64 ts = bpf_ktime_get_ns();
 
     events.ringbuf_output(&sdata, sizeof(sdata), 0);
-    return 0;   
+    return 0;
 }
 """
 
 class ContainerFilter:
-    def __init__(self, mntnsmap):
+    def __init__(self, mntnsmap: str):
         self.mntnsmap = mntnsmap
         self.cgroupmap = None
 
 class  Probe:
-    def __init__(self, queue: Queue, window_size, mntnsmap: str):
+    def __init__(self, queue: Queue, window_size: int, mntnsmap: str):
         self.htab_batch_ops = BPF.kernel_struct_has_field(b'bpf_map_ops', b'map_lookup_and_delete_batch') == 1
         args = ContainerFilter(mntnsmap)
         bpf = filter_by_containers(args) + bpf_program
@@ -59,15 +59,10 @@ class  Probe:
     def monitor(self):
         b = defaultdict(list)
 
-        # TODO: this is unused so, remove it
-        def handle_e(cpu, data, size):
-            event = self.bpf["events"].event(data)
-            self.queue.put([[event.ts, event.tid, event.sid]])
-
         def handle_event(cpu, data, size):
             event = self.bpf["events"].event(data)
             b[event.tid].append(event.sid)
-            
+
             if len(b[event.tid]) > self.window_size:
                 b[event.tid].pop(0)
 
@@ -98,16 +93,6 @@ class  Probe:
         grouped.clear()
         return threads
 
-def get_data(b, flag=0):
+def get_data(b, flag: int = 0):
     entry = [f"{k.value},{v.value},{flag}" for k, v in sorted(b["syscalls"].items_lookup_and_delete_batch(), key=lambda kv: kv[0].value)]
     return '\n'.join(entry) + "\n"
-
-def trace(mntnsmap):
-    args = ContainerFilter(mntnsmap)
-    bpf = filter_by_containers(args) + bpf_program
-    b = BPF(text=bpf)
-    return b
-
-# TODO: is this even used??
-def end_trace(b):
-    b.detach_tracepoint("raw_syscalls:sys_exit")
