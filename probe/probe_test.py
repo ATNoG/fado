@@ -1,6 +1,8 @@
 from .bcc import BPF
 import docker, os
 
+# TODO: this NEEDS to be started before any containers starts or those first containers will NOT be monitored (needs to be fixed)
+
 client = docker.DockerClient()
 valid_images = [
     'yaml_load'
@@ -16,7 +18,6 @@ def get_ebpf_map():
     print("[+] eBPF map is setup...")
     return bpf.get_table("mnt_ns_set")
 
-# TODO: is the byte order correct??
 def add_container_to_ebpf_map(ebpf_map, container: ValidContainer):
     key = ebpf_map.Key(container.ns_id)
     value = ebpf_map.Leaf(0) 
@@ -40,7 +41,7 @@ def containers_manager(ebpf_map):
                 ns_id = os.stat(f'/proc/{container_pid}/ns/mnt').st_ino
                 valid_containers[container_id] = ValidContainer(container_image, ns_id)
                 add_container_to_ebpf_map(ebpf_map, valid_containers[container_id])
-                print("[+] Container created")
+                print(f"[+] Container created with mnt ns id of: {ns_id}")
 
             # TODO: this seems to run more than once when a containers is getting terminated. why?
             elif container_action in ('die', 'stop', 'kill') and container_id in valid_containers:
