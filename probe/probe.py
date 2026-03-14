@@ -1,8 +1,8 @@
 from .bcc.containers import filter_by_containers
 from collections import defaultdict
+from threading import Thread, Lock
 from queue import Queue
 from .bcc import BPF
-import threading
 
 bpf_program = """
 struct syscall_data{
@@ -12,7 +12,7 @@ struct syscall_data{
     u64 mnt_ns_id;
 };
 
-BPF_RINGBUF_OUTPUT(events, 1 << 12); // 4KB ring buffer
+BPF_RINGBUF_OUTPUT(events, 1); // 16MB ring buffer
 
 TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
     if (container_should_be_filtered()) {
@@ -47,36 +47,39 @@ class ContainerFilter:
         self.cgroupmap = None
 
 class  Probe:
-    def __init__(self, window_size: int, mntnsmap: str):
+    def __init__(self, queues: dict[int, int], window_size: int, mntnsmap: str, lock: Lock):
         # self.htab_batch_ops = BPF.kernel_struct_has_field(b'bpf_map_ops', b'map_lookup_and_delete_batch') == 1
         args = ContainerFilter(mntnsmap)
         bpf = filter_by_containers(args) + bpf_program
-        self.bpf = BPF(text=bpf)
+        self.bpf = BPF(text=bpf, cflags=["-Wno-microsoft-anon-tag", "-fms-extensions"])
         self.window_size = window_size
         # self.ready = False
-        self.queues = defaultdict(Queue) # queues: dict[int, Queue]
+        self.queues = queues # defaultdict(int) # queues: dict[int, Queue]
         # self.data = []
-        self.monitor_dict = threading.Thread(target=self.monitor, daemon=True)
+        self.lock = lock
+        self.monitor_dict = Thread(target=self.monitor, daemon=True)
         self.monitor_dict.start()
 
-    def get_queues(self) -> dict[int, Queue]:
-        return self.queues
+    # def get_queues(self) -> dict[int, int]:
+    #     return self.queues
 
     def monitor(self):
         # b = defaultdict(list)
-        b = defaultdict(lambda: defaultdict(list))
-
-        bruh = defaultdict(int)
+        # b = defaultdict(lambda: defaultdict(list))
+        # bruh = defaultdict(int)
 
         # TODO: do i really need to do this by threads?
         def handle_event(cpu, data, size):
             event = self.bpf["events"].event(data)
-            bruh[event.mnt_ns_id] += 1
+            with self.lock:
+                if event.mnt_ns_id in self.queues:
+                    self.queues[event.mnt_ns_id] += 1
 
-            # print(f"\rmnt ns id: {event.mnt_ns_i}", end='', flush=True)
-            for key in bruh.keys():
-                print(f"size: {bruh[key]} ", end='', flush=False)
-            print("\t\t\t\t\t\r", end='', flush=True)
+            # bruh[event.mnt_ns_id] += 1
+            # # print(f"\rmnt ns id: {event.mnt_ns_i}", end='', flush=True)
+            # for key in bruh.keys():
+            #     print(f"size: {bruh[key]} ", end='', flush=False)
+            # print("\t\t\t\t\t\r", end='', flush=True)
 
             # # b[event.tid].append(event.sid)
             # thread_window = b[event.mnt_ns_id][event.tid]

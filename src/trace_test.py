@@ -1,29 +1,42 @@
 from numpy import isneginf, array as np_array
+from collections import defaultdict
 from utils import FILES, TOLERANCE
 from collections import deque
+from threading import Lock
 from queue import Queue
 from probe import Probe
 from pickle import load
+from time import sleep
 from sys import exit
 import os
 
-def trace(model_file: str, mntns: str):
-    model_file = os.path.join(FILES, model_file) + ".pkl"
+def trace(mntns: str):
+    # model_file = os.path.join(FILES, model_file) + ".pkl"
+    # # load the model
+    # with open(model_file, 'rb') as f:
+    #     saved_data = load(f)
+    #     # model = saved_data['model']
+    #     # threshold = saved_data['threshold']
+    #     window_size = saved_data['window_size']
+    #     # whitelist = saved_data['whitelist']
 
-    # load the model
-    with open(model_file, 'rb') as f:
-        saved_data = load(f)
-        # model = saved_data['model']
-        # threshold = saved_data['threshold']
-        window_size = saved_data['window_size']
-        # whitelist = saved_data['whitelist']
-
-    probe = Probe(window_size, mntns)
-    queues = probe.get_queues()
+    lock = Lock()
+    queues = Probe(2, mntns, lock).get_queues()
 
     print("started")
+    # bruh = defaultdict(int)
     while True:
-        pass
+        with lock:
+            for key in queues.keys():
+                print(f"size: {queues[key]} ", end='', flush=False)
+            print("\t\t\t\t\t\t\t\r", end='', flush=True)
+            sleep(0.1)
+
+            # bruh[event.mnt_ns_id] += 1
+            # # print(f"\rmnt ns id: {event.mnt_ns_i}", end='', flush=True)
+            # for key in bruh.keys():
+            #     print(f"size: {bruh[key]} ", end='', flush=False)
+            # print("\t\t\t\t\t\r", end='', flush=True)
 
     # while True:
     #     for key in queues.copy().keys():
@@ -63,4 +76,4 @@ def trace(model_file: str, mntns: str):
 
 if __name__ == "__main__":
     import sys
-    trace(sys.argv[1], "/sys/fs/bpf/mnt_ns_set")
+    trace("/sys/fs/bpf/mnt_ns_set")
