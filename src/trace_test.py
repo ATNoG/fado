@@ -4,7 +4,7 @@ from utils import FILES, TOLERANCE
 from collections import deque
 from threading import Lock
 from queue import Queue
-from probe import Probe
+from probe import BpfProbe
 from pickle import load
 from time import sleep
 from sys import exit
@@ -21,7 +21,7 @@ def trace(mntns: str):
     #     # whitelist = saved_data['whitelist']
 
     lock = Lock()
-    queues = Probe(2, mntns, lock).get_queues()
+    queues = BpfProbe(2, mntns, lock).get_queues()
 
     print("started")
     # bruh = defaultdict(int)

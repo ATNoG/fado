@@ -2,7 +2,7 @@ from utils import BaseSimulation, Scenario, ScenarioManager, DB
 from multiprocessing import Process, Event
 from .cleanup_data import cleanup
 from random import random
-from probe import Probe
+from probe import BpfProbe
 from queue import Queue
 from time import sleep
 from sys import exit
@@ -16,7 +16,7 @@ def monitor_data(scenario: BaseSimulation, data_path: str, stop_sim, exploit_fla
     chance = 0.005
     triggered_exploit = False
     flag = 0
-    probe = Probe(queue, window_size, mntns)
+    probe = BpfProbe(queue, window_size, mntns)
 
     while True: 
         flag = 0

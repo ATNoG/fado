@@ -1,2 +1,2 @@
-from .probe import Probe
+from .probe import BpfProbe
 from .sysdig import SysdigProbe

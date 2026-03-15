@@ -1,7 +1,6 @@
 from .bcc.containers import filter_by_containers
-from collections import defaultdict
+from models.bpf import BpfContainer
 from threading import Thread, Lock
-from queue import Queue
 from .bcc import BPF
 
 bpf_program = """
@@ -46,34 +45,27 @@ class ContainerFilter:
         self.mntnsmap = mntnsmap
         self.cgroupmap = None
 
-class  Probe:
-    def __init__(self, queues: dict[int, int], window_size: int, mntnsmap: str, lock: Lock):
-        # self.htab_batch_ops = BPF.kernel_struct_has_field(b'bpf_map_ops', b'map_lookup_and_delete_batch') == 1
+# TODO: should this be in the "models"?
+class BpfProbe:
+    """Attaches to specific containers for probing"""
+
+    def __init__(self, queues: dict[int, BpfContainer], window_size: int, mntnsmap: str, lock: Lock):
         args = ContainerFilter(mntnsmap)
         bpf = filter_by_containers(args) + bpf_program
         self.bpf = BPF(text=bpf, cflags=["-Wno-microsoft-anon-tag", "-fms-extensions"])
         self.window_size = window_size
-        # self.ready = False
-        self.queues = queues # defaultdict(int) # queues: dict[int, Queue]
-        # self.data = []
+        self.queues = queues
         self.lock = lock
-        self.monitor_dict = Thread(target=self.monitor, daemon=True)
-        self.monitor_dict.start()
-
-    # def get_queues(self) -> dict[int, int]:
-    #     return self.queues
+        self.thread = Thread(target=self.monitor, daemon=True)
+        self.thread.start()
 
     def monitor(self):
-        # b = defaultdict(list)
-        # b = defaultdict(lambda: defaultdict(list))
-        # bruh = defaultdict(int)
-
-        # TODO: do i really need to do this by threads?
         def handle_event(cpu, data, size):
             event = self.bpf["events"].event(data)
             with self.lock:
                 if event.mnt_ns_id in self.queues:
-                    self.queues[event.mnt_ns_id] += 1
+                    # TODO: this needs to be done by thread ids
+                    self.queues[event.mnt_ns_id].queue.put(event.sid, block=True)
 
             # bruh[event.mnt_ns_id] += 1
             # # print(f"\rmnt ns id: {event.mnt_ns_i}", end='', flush=True)
@@ -99,18 +91,3 @@ class  Probe:
 
     def end_trace(self):
         self.bpf.detach_tracepoint(b"raw_syscalls:sys_exit")
-
-    # def gen_sliding_window(self, data, window_size):
-    #     grouped = defaultdict(list)
-    #     for ts, tid, sid in data:
-    #         grouped[tid].append(sid)
-    #     threads = {}
-    #     for tid, syscalls in grouped.items():
-    #         grouped_syscalls = [syscalls[i:i + window_size] for i in range(0, len(syscalls) - window_size + 1)]
-    #         threads[tid] = grouped_syscalls
-    #     grouped.clear()
-    #     return threads
-
-# def get_data(b, flag: int = 0):
-#     entry = [f"{k.value},{v.value},{flag}" for k, v in sorted(b["syscalls"].items_lookup_and_delete_batch(), key=lambda kv: kv[0].value)]
-#     return '\n'.join(entry) + "\n"

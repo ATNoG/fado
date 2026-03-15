@@ -1,38 +1,58 @@
-from collections import defaultdict
+from models.bpf import BpfContainer
 from threading import Thread, Lock
-from probe import Probe
+from probe import BpfProbe
+from queue import Queue
 from time import sleep
 from .bcc import BPF
 import docker, os
 
 # TODO: this NEEDS to be started before any containers starts or those first containers will NOT be monitored (needs to be fixed)
 
+valid_containers: dict[int, BpfContainer] = {}
 client = docker.DockerClient()
 valid_images = [
     'yaml_load'
 ]
 
-class ValidContainer:
-    def __init__(self, image: str, ns_id: int):
-        self.image = image
-        self.ns_id = ns_id
+def recreate_ebpf_map():
+    if os.path.exists("/sys/fs/bpf/mnt_ns_set"):
+        os.remove("/sys/fs/bpf/mnt_ns_set")
 
-def get_ebpf_map():
     bpf = BPF(text="""BPF_TABLE_PINNED("hash", u64, u32, mnt_ns_set, 128, "/sys/fs/bpf/mnt_ns_set");""")
     print("[+] eBPF map is setup...")
     return bpf.get_table("mnt_ns_set")
 
-def add_container_to_ebpf_map(ebpf_map, container: ValidContainer):
-    key = ebpf_map.Key(container.ns_id)
-    value = ebpf_map.Leaf(0) 
+def add_container(ebpf_map, image: str, container_id: str, queue: Queue[int], lock: Lock):
+    # TODO: what if this fails somehow?
+    container_pid = client.containers.get(container_id).attrs['State']['Pid']
+    ns_id = os.stat(f'/proc/{container_pid}/ns/mnt').st_ino
+
+    with lock:
+        valid_containers[ns_id] = BpfContainer(image, container_id, queue)
+
+    key = ebpf_map.Key(ns_id)
+    value = ebpf_map.Leaf(0)
     ebpf_map[key] = value
+    print("[+] Container created")
 
-def remove_container_from_ebpf_map(ebpf_map, container: ValidContainer):
-    key = ebpf_map.Key(container.ns_id)
+def remove_container(ebpf_map, container_id: str, lock: Lock):
+    ns_id = None
+    with lock:
+        for c_ns_id, c in valid_containers.items():
+            if c.container_id == container_id:
+                ns_id = c_ns_id
+                break
+
+        if ns_id == None:
+            return
+
+        del valid_containers[ns_id]
+
+    key = ebpf_map.Key(ns_id)
     del ebpf_map[key]
+    print("[+] Container removed")
 
-def containers_manager(ebpf_map, queues, lock: Lock):
-    valid_containers = {}
+def containers_manager(ebpf_map, lock: Lock):
     for event in client.events(decode=True):
         if event['Type'] == 'container':
             container_action = event['Action']
@@ -41,37 +61,23 @@ def containers_manager(ebpf_map, queues, lock: Lock):
 
             # TODO: does it make sense to assert that this container is not in the `valid_containers` list??
             if container_action == 'start' and container_image in valid_images:
-                container_pid = client.containers.get(container_id).attrs['State']['Pid']
-                ns_id = os.stat(f'/proc/{container_pid}/ns/mnt').st_ino
-                valid_containers[container_id] = ValidContainer(container_image, ns_id)
-                add_container_to_ebpf_map(ebpf_map, valid_containers[container_id])
-                queues[ns_id] = 0 # add a defualt value to the queue
-                print(f"[+] Container created with mnt ns id of: {ns_id}")
+                add_container(ebpf_map, container_image, container_id, Queue(maxsize=1000), lock)
 
             # TODO: this seems to run more than once when a containers is getting terminated. why?
-            elif container_action in ('die', 'stop', 'kill') and container_id in valid_containers:
-                remove_container_from_ebpf_map(ebpf_map, valid_containers[container_id])
-                with lock:
-                    del queues[valid_containers[container_id].ns_id]
-                del valid_containers[container_id]
-                print("[+] Container removed")
+            elif container_action in ('die', 'stop', 'kill'):
+                remove_container(ebpf_map, container_id, lock)
 
 if __name__ == '__main__':
-    # valid_containers = []
-    # new_containers, old_containers = bruh(valid_containers)
-    # add_container_to_ebpf_map(ebpf_map, new_containers[0])
-
     lock = Lock()
-    ebpf_map = get_ebpf_map()
-    queues = dict()
-    Probe(queues, 2, "/sys/fs/bpf/mnt_ns_set", lock)
-    Thread(target=containers_manager, args=(ebpf_map, queues, lock), daemon=True).start()
-    # containers_manager(ebpf_map, queues, lock)
+    ebpf_map = recreate_ebpf_map()
+    BpfProbe(valid_containers, 2, "/sys/fs/bpf/mnt_ns_set", lock)
+    Thread(target=containers_manager, args=(ebpf_map, lock), daemon=True).start()
 
     print("started")
     while True:
-        with lock:
-            for key in queues.keys():
-                print(f"size: {queues[key]} ", end='', flush=False)
-            print("\t\t\t\t\t\t\t\t\r", end='', flush=True)
-            sleep(0.1)
+        # with lock:
+        #     for _, c in valid_containers.items():
+        #         print(f"{c.container_id}: {c.queue} ", end='', flush=False)
+        #         pass
+        #     print("\t\t\t\t\t\t\t\t\r", end='', flush=True)
+        sleep(1)

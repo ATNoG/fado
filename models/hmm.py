@@ -1,12 +1,9 @@
 from hmmlearn.hmm import CategoricalHMM
 from hmmlearn.base import ConvergenceMonitor
-import pickle
-import numpy as np
-import os
+import os, pickle, numpy as np
 from collections import deque
 from time import time_ns, time
 from utils import STATS, FIGS, FILES, DB, TOLERANCE, WHITELIST_FREQUENCY
-
 
 class EarlyStop(ConvergenceMonitor):
     def __init__(self, n_iter=100, tol=1e-2, patience=5, verbose=False):
@@ -27,7 +24,6 @@ class EarlyStop(ConvergenceMonitor):
         if self._wait >= self.patience:
             return True
         return False
-
 
 class HMM:
     def __init__(self, model_file, n_components=10, n_iter=10):
@@ -52,7 +48,6 @@ class HMM:
             print("Creating Model...")
             self.model = CategoricalHMM(n_components=self.components, n_features=self.n_features, n_iter=self.iter, random_state=42, verbose=True)
             self.model.monitor_ = EarlyStop(self.model.n_iter, 0.1, 5, True)
- 
 
     def train(self, train_data):
         from tqdm import tqdm
@@ -140,7 +135,6 @@ class HMM:
         from matplotlib.colors import LogNorm
         from sklearn.metrics import confusion_matrix, accuracy_score, classification_report
 
-
         test_data = os.path.join(DB, test_data) + ".csv"
         test_data = pd.read_csv(test_data, header=None)
         flags = test_data.iloc[:, -1].copy()
@@ -172,14 +166,13 @@ class HMM:
                 scores.append(self.threshold - 100)
             else:
                 scores.append(score)
-            
+
             if score < self.threshold or np.isneginf(score):
                 predictions.append(1)
                 tolerant_queue.append(1)
             else:
                 predictions.append(0)
                 tolerant_queue.append(0)
-
 
             ## Make sure that it isnt an isolated case of anomaly which indicates mislabelling
             if flags[flag] == 1 and sum(tolerant_flags) > (len(tolerant_queue) * TOLERANCE):
@@ -192,12 +185,10 @@ class HMM:
                 else:
                     new_scores.append(score)
 
-
             if sum(tolerant_queue) >= (len(tolerant_queue) * TOLERANCE):
                 tolerant_predictions.append(1)
             else:
                 tolerant_predictions.append(0)
-
 
         # GENERATE FIGURES AND STATISTICAL DATA
 
@@ -239,7 +230,6 @@ class HMM:
             os.path.join(FIGS, f"{self.name}_log_likelihood.png"),
             bbox_inches="tight",
             pad_inches=0)
-        
 
         # ### TOLERANT
         plt.figure(figsize=(14, 8))
@@ -279,7 +269,6 @@ class HMM:
         ax = plt.gca()
         ax.xaxis.set_major_formatter(EngFormatter())
         ax.margins(x=0, y=0)
-
 
         # Legend (avoid duplicates and keep compact)
         handles, labels = ax.get_legend_handles_labels()

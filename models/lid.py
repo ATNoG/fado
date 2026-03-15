@@ -1,7 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple, Iterable, Optional
+from typing import Dict, List, Tuple
 from probe.bcc.syscall import syscalls
 
 @dataclass(frozen=True)
@@ -10,12 +10,7 @@ class Event:
     tid: int
     syscall_id: int  # mapped via syscall_map
 
-
-def parse_events_from_csv(
-    path: str | Path,
-    syscall_map: Dict[str, int],
-    require_in_map: bool = True,
-) -> List[Event]:
+def parse_events_from_csv(path: str | Path, syscall_map: Dict[str, int], require_in_map: bool = True) -> List[Event]:
     """
     Parse a whitespace-delimited 'CSV' like the sample.
     Keeps only rows with direction '<'. Maps syscall to ID via syscall_map.
@@ -63,12 +58,7 @@ def parse_events_from_csv(
 
     return events
 
-
-def group_windows_by_interval_and_tid(
-    events: List[Event],
-    n: int,
-    interval_seconds: int = 5,
-) -> Dict[int, Dict[int, List[Tuple[int, ...]]]]:
+def group_windows_by_interval_and_tid(events: List[Event], n: int, interval_seconds: int = 5) -> Dict[int, Dict[int, List[Tuple[int, ...]]]]:
     """
     Returns:
       windows[interval_index][tid] = list of windows (each window is a tuple of syscall_ids)
@@ -87,7 +77,6 @@ def group_windows_by_interval_and_tid(
     interval_ns = interval_seconds * 1_000_000_000
     start_ts = events[0].ts_ns
     end_ts = events[-1].ts_ns
-
 
     # Bucket events into interval -> tid -> list[syscall_id]
     buckets: Dict[int, Dict[int, List[int]]] = defaultdict(lambda: defaultdict(list))
@@ -130,7 +119,6 @@ def group_windows_by_interval_and_tid(
             carry[tid] = []
 
     return windows
-
 
 # ---- Example usage ----
 if __name__ == "__main__":
