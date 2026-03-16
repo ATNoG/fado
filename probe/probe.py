@@ -64,14 +64,7 @@ class BpfProbe:
             event = self.bpf["events"].event(data)
             with self.lock:
                 if event.mnt_ns_id in self.queues:
-                    # TODO: this needs to be done by thread ids
-                    self.queues[event.mnt_ns_id].queue.put(event.sid, block=True)
-
-            # bruh[event.mnt_ns_id] += 1
-            # # print(f"\rmnt ns id: {event.mnt_ns_i}", end='', flush=True)
-            # for key in bruh.keys():
-            #     print(f"size: {bruh[key]} ", end='', flush=False)
-            # print("\t\t\t\t\t\r", end='', flush=True)
+                    self.queues[event.mnt_ns_id].queue.put((event.tid, event.sid), block=True)
 
             # # b[event.tid].append(event.sid)
             # thread_window = b[event.mnt_ns_id][event.tid]

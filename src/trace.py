@@ -38,6 +38,7 @@ def trace(model_file: str, mntns: str):
                     seq = np_array(sequence).reshape(-1,1)
                     score = model.score(seq, [len(sequence)])
                     results.append(1 if score < threshold or isneginf(score) else 0)
+
                 if sum(results) > len(results) * TOLERANCE:
                     flag = 1
 

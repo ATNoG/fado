@@ -28,6 +28,7 @@ for i in range(4, 7):  # columns APT_S1, APT_S2, APT_S3
     plt.plot(x_values, df[col_name], label=f"S{scenario_num} (APT)", linestyle='--', marker='o', linewidth=4, markersize=12)
 
 plt.axvline(x=50, color='red', linestyle=':', linewidth=3)
+
 # Labels and legend
 plt.xticks([10, 30, 50, 70, 100])
 plt.xlabel(df.columns[0])
@@ -35,6 +36,4 @@ plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 plt.grid(True)
 plt.tight_layout()
 plt.margins(0)  # remove margins around data
-plt.savefig(output,
-            bbox_inches='tight', 
-            pad_inches=0)
+plt.savefig(output, bbox_inches='tight', pad_inches=0)

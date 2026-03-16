@@ -1,8 +1,8 @@
 from models.bpf import BpfContainer
-from threading import Thread, Lock
+from threading import Lock
 from probe import BpfProbe
+from utils import FILES
 from queue import Queue
-from time import sleep
 from .bcc import BPF
 import docker, os
 
@@ -10,9 +10,9 @@ import docker, os
 
 valid_containers: dict[int, BpfContainer] = {}
 client = docker.DockerClient()
-valid_images = [
-    'yaml_load'
-]
+valid_images = {
+    'yaml_load': 'YamlLoad_5s_w2_20p'
+}
 
 def recreate_ebpf_map():
     if os.path.exists("/sys/fs/bpf/mnt_ns_set"):
@@ -22,13 +22,14 @@ def recreate_ebpf_map():
     print("[+] eBPF map is setup...")
     return bpf.get_table("mnt_ns_set")
 
-def add_container(ebpf_map, image: str, container_id: str, queue: Queue[int], lock: Lock):
+def add_container(ebpf_map, image: str, container_id: str, queue: Queue[tuple[int, int]], lock: Lock):
     # TODO: what if this fails somehow?
     container_pid = client.containers.get(container_id).attrs['State']['Pid']
     ns_id = os.stat(f'/proc/{container_pid}/ns/mnt').st_ino
 
+    model_path = FILES / (valid_images[image] + '.pkl')
     with lock:
-        valid_containers[ns_id] = BpfContainer(image, container_id, queue)
+        valid_containers[ns_id] = BpfContainer(image, container_id, model_path, queue)
 
     key = ebpf_map.Key(ns_id)
     value = ebpf_map.Leaf(0)
@@ -71,13 +72,14 @@ if __name__ == '__main__':
     lock = Lock()
     ebpf_map = recreate_ebpf_map()
     BpfProbe(valid_containers, 2, "/sys/fs/bpf/mnt_ns_set", lock)
-    Thread(target=containers_manager, args=(ebpf_map, lock), daemon=True).start()
+    # Thread(target=containers_manager, args=(ebpf_map, lock), daemon=True).start()
+    containers_manager(ebpf_map, lock)
 
-    print("started")
-    while True:
-        # with lock:
-        #     for _, c in valid_containers.items():
-        #         print(f"{c.container_id}: {c.queue} ", end='', flush=False)
-        #         pass
-        #     print("\t\t\t\t\t\t\t\t\r", end='', flush=True)
-        sleep(1)
+    # print("started")
+    # while True:
+    #     # with lock:
+    #     #     for _, c in valid_containers.items():
+    #     #         print(f"{c.container_id}: {c.queue} ", end='', flush=False)
+    #     #         pass
+    #     #     print("\t\t\t\t\t\t\t\t\r", end='', flush=True)
+    #     sleep(1)
