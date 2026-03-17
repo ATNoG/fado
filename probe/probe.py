@@ -11,7 +11,7 @@ struct syscall_data{
     u64 mnt_ns_id;
 };
 
-BPF_RINGBUF_OUTPUT(events, 1); // 16MB ring buffer
+BPF_RINGBUF_OUTPUT(events, 1); // 4KB ring buffer
 
 TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
     if (container_should_be_filtered()) {
@@ -23,7 +23,8 @@ TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
         key = 335;
     }
 
-    if (key == 202) { // ignore futex syscalls
+    // ignore futex syscalls
+    if (key == 202) {
         return 0;
     }
 
@@ -66,14 +67,6 @@ class BpfProbe:
                 if event.mnt_ns_id in self.queues:
                     self.queues[event.mnt_ns_id].queue.put((event.tid, event.sid), block=True)
 
-            # # b[event.tid].append(event.sid)
-            # thread_window = b[event.mnt_ns_id][event.tid]
-            # thread_window.append(event.sid)
-            # if len(thread_window) > self.window_size:
-            #     thread_window.pop(0)
-            # if len(thread_window) == self.window_size:
-            #     self.queues[event.mnt_ns_id].put([thread_window[:]], block=True)
-
         # register callback
         self.bpf["events"].open_ring_buffer(handle_event)
 
@@ -82,5 +75,5 @@ class BpfProbe:
             # blocks until events arrive, then triggers handle_event()
             self.bpf.ring_buffer_poll()
 
-    def end_trace(self):
+    def stop(self):
         self.bpf.detach_tracepoint(b"raw_syscalls:sys_exit")

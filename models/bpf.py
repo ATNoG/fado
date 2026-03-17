@@ -1,6 +1,6 @@
 from numpy import isneginf, array as np_array
 from collections import defaultdict, deque
-from threading import Thread
+from threading import Thread, Event
 from utils import TOLERANCE
 from pathlib import Path
 from pickle import load
@@ -13,7 +13,7 @@ class BpfContainer:
         self.image = image
         self.container_id = container_id
         self.queue = queue
-        # TODO: need to stop the thread when container get removed
+        self.thread_event = Event()
         self.thread = Thread(target=self.get_windows, daemon=True)
         self.thread.start()
 
@@ -25,14 +25,23 @@ class BpfContainer:
             self.window_size = saved_data['window_size']
             self.whitelist = saved_data['whitelist']
 
+    def stop(self):
+        # wake up the thread (with dummy values) just in case it is stuck waiting for queue events
+        self.queue.put((-1, -1))
+        self.thread_event.set()
+        self.thread.join()
+
     def get_windows(self):
         windows = defaultdict(list[int])
         results = deque([0] * 10, maxlen=10)
-        while True:
-            # while not self.queue.empty():
+        while not self.thread_event.is_set():
             tid, sid = self.queue.get(block=True, timeout=None)
-            windows[tid].append(sid)
 
+            # check for dummy wake up values
+            if tid == -1 and sid == -1:
+                continue
+
+            windows[tid].append(sid)
             if len(windows[tid]) > self.window_size:
                 windows[tid].pop(0)
 

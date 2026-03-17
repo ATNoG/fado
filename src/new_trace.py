@@ -1,9 +1,9 @@
 from models.bpf import BpfContainer
 from threading import Lock
 from probe import BpfProbe
+from probe.bcc import BPF
 from utils import FILES
 from queue import Queue
-from .bcc import BPF
 import docker, os
 
 # TODO: this NEEDS to be started before any containers starts or those first containers will NOT be monitored (needs to be fixed)
@@ -47,6 +47,7 @@ def remove_container(ebpf_map, container_id: str, lock: Lock):
         if ns_id == None:
             return
 
+        valid_containers[ns_id].stop()
         del valid_containers[ns_id]
 
     key = ebpf_map.Key(ns_id)
@@ -72,14 +73,4 @@ if __name__ == '__main__':
     lock = Lock()
     ebpf_map = recreate_ebpf_map()
     BpfProbe(valid_containers, 2, "/sys/fs/bpf/mnt_ns_set", lock)
-    # Thread(target=containers_manager, args=(ebpf_map, lock), daemon=True).start()
     containers_manager(ebpf_map, lock)
-
-    # print("started")
-    # while True:
-    #     # with lock:
-    #     #     for _, c in valid_containers.items():
-    #     #         print(f"{c.container_id}: {c.queue} ", end='', flush=False)
-    #     #         pass
-    #     #     print("\t\t\t\t\t\t\t\t\r", end='', flush=True)
-    #     sleep(1)
