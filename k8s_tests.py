@@ -1,36 +1,72 @@
-from kubernetes import client, config, watch
-import socket
+from kubernetes import config as K8sconfig
+from kubernetes.client import CoreV1Api
+from models.bpf import BpfContainer
+import socket, os, subprocess, json
+from kubernetes.watch import Watch
+from threading import Lock
+from probe.bcc import BPF
 
-# load_incluster_config() if running inside a pod
-config.load_kube_config(config_file="/etc/kubernetes/kubelet.conf")
-v1 = client.CoreV1Api()
-w = watch.Watch()
+# maps namespace ids to the containers themselves
+valid_containers: dict[int, BpfContainer] = {}
+valid_images = {
+    'yaml_load': 'YamlLoad_5s_w2_20p'
+}
 
-print(f"Listening for Knative Pod events...")
+def recreate_ebpf_map():
+    if os.path.exists("/sys/fs/bpf/mnt_ns_set"):
+        os.remove("/sys/fs/bpf/mnt_ns_set")
 
-node_selector = f"spec.nodeName={socket.gethostname()}"
-for event in w.stream(v1.list_namespaced_pod, namespace="default", field_selector=node_selector):
-    if type(event) != dict:
-        continue
+    bpf = BPF(text="""BPF_TABLE_PINNED("hash", u64, u32, mnt_ns_set, 128, "/sys/fs/bpf/mnt_ns_set");""")
+    print("[+] eBPF map is setup...")
+    return bpf.get_table("mnt_ns_set")
 
-    event_type = event['type']
-    pod = event['object']
+def get_pid(container_id: str) -> int:
+    # remove the 'containerd://' or 'docker://' prefix
+    container_id = container_id.split("://")[-1]
 
-    # filter for Knative pods using Knative's default labels
-    if pod.metadata.labels and 'serving.knative.dev/revision' in pod.metadata.labels:
-        # check if the container is running
-        if event_type in ('ADDED', 'MODIFIED') and pod.status.phase == 'Running':
-            image = pod.metadata.annotations['client.knative.dev/user-image']
-            name = pod.metadata.name
-            print(f"Pod started with image: {image}")
-            print(pod)
-        else:
-            print(f"got action: {event_type}")
+    # ask the local container runtime for the full state in JSON format
+    result = subprocess.run(["crictl", "inspect", container_id], capture_output=True, text=True, check=True)
+    data = json.loads(result.stdout)
+    return data['info']['pid']
 
-        # if event_type == 'ADDED':
-        #     print(f"Knative Pod Created: {pod_name}")
-        # elif event_type == 'MODIFIED':
-        #     if pod.status.phase == 'Terminating':
-        #         print(f"Knative Pod Terminating: {pod_name}")
-        # elif event_type == 'DELETED':
-        #     print(f"Knative Pod Deleted: {pod_name}")
+# def add_container(ebpf_map, image: str):
+#     # TODO: make sure the container is not already present
+#     print(f"Pod started with image: {image}")
+
+def containers_manager(ebpf_map, lock: Lock):
+    K8sconfig.load_kube_config(config_file="/etc/kubernetes/kubelet.conf")
+    node_selector = f"spec.nodeName={socket.gethostname()}"
+    for event in Watch().stream(CoreV1Api().list_namespaced_pod, namespace="default", field_selector=node_selector):
+        # the other event types are not usefull
+        if type(event) != dict:
+            continue
+
+        pod = event['object']
+        if not pod.metadata.labels or 'serving.knative.dev/revision' not in pod.metadata.labels:
+            continue
+
+        event_type = event['type']
+        if event_type in ('ADDED', 'MODIFIED') and pod.status.phase == 'Running' and pod.metadata.deletion_timestamp is None:
+            if not pod.status.container_statuses:
+                continue
+
+            for container_status in pod.status.container_statuses:
+                # TODO: only pods with a single container are supported!
+                if container_status.name != 'user-container':
+                    continue
+
+                if not container_status.state or not container_status.state.running:
+                    continue
+
+                host_pid = get_pid(container_status.container_id)
+                image = pod.metadata.annotations['client.knative.dev/user-image'] # example: nginxdemos/hello:plain-text
+                print(f"Pod started with image: {image} and PID: {host_pid}")
+                break
+        elif event_type == 'MODIFIED' and pod.metadata.deletion_timestamp is not None:
+            print(f"Pod terminated...")
+
+if __name__ == '__main__':
+    lock = Lock()
+    ebpf_map = recreate_ebpf_map()
+    # BpfProbe(valid_containers, 2, "/sys/fs/bpf/mnt_ns_set", lock)
+    containers_manager(ebpf_map, lock)
