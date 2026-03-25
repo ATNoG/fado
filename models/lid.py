@@ -31,7 +31,7 @@ def parse_events_from_csv(path: str | Path, syscall_map: Dict[str, int], require
             if len(parts) < 7:
                 continue
             ts_s, _cpu, _pid, _comm, tid_s, syscall, direction_and_rest = parts
-            
+
             # direction_and_rest starts with '<' or '>' then the remainder.
             direction = direction_and_rest.split(maxsplit=1)[0]
 

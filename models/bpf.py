@@ -49,7 +49,7 @@ class BpfContainer:
                 results.append(self.run_model(windows[tid]))
 
                 if sum(results) > len(results) * TOLERANCE:
-                    print(f"Anomaly detected")
+                    print('Anomaly detected')
 
     def run_model(self, window: list[int]) -> int:
         # data = []

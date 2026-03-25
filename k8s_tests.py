@@ -17,23 +17,23 @@ valid_images = {
 }
 
 def recreate_ebpf_map():
-    if os.path.exists("/sys/fs/bpf/mnt_ns_set"):
-        os.remove("/sys/fs/bpf/mnt_ns_set")
+    if os.path.exists('/sys/fs/bpf/mnt_ns_set'):
+        os.remove('/sys/fs/bpf/mnt_ns_set')
 
     bpf = BPF(text="""BPF_TABLE_PINNED("hash", u64, u32, mnt_ns_set, 128, "/sys/fs/bpf/mnt_ns_set");""")
-    print("[+] eBPF map is setup...")
-    return bpf.get_table("mnt_ns_set")
+    print('[+] eBPF map is setup...')
+    return bpf.get_table('mnt_ns_set')
 
 # TODO: what if this fails?
 def add_container(ebpf_map, image: str, container_id: str, queue: Queue[tuple[int, int]], lock: Lock):
     # get the PID from the local container runtime and the respective namespace id
-    result = subprocess.run(["crictl", "inspect", container_id], capture_output=True, text=True, check=True)
+    result = subprocess.run(['crictl', 'inspect', container_id], capture_output=True, text=True, check=True)
     container_pid = json.loads(result.stdout)['info']['pid']
     ns_id = os.stat(f'/proc/{container_pid}/ns/mnt').st_ino
 
     model_path = FILES / (valid_images[image] + '.pkl')
     with lock:
-        # don't readd the same container
+        # don't re-add the same container
         if ns_id in valid_containers:
             return
 
@@ -42,7 +42,7 @@ def add_container(ebpf_map, image: str, container_id: str, queue: Queue[tuple[in
     key = ebpf_map.Key(ns_id)
     value = ebpf_map.Leaf(0)
     ebpf_map[key] = value
-    print(f"[+] Container created with image: {image}")
+    print(f'[+] Container created with image: {image}')
 
 def remove_container(ebpf_map, container_id: str, lock: Lock):
     ns_id = None
@@ -60,12 +60,12 @@ def remove_container(ebpf_map, container_id: str, lock: Lock):
 
     key = ebpf_map.Key(ns_id)
     del ebpf_map[key]
-    print("[+] Container removed")
+    print('[+] Container removed')
 
 def containers_manager(ebpf_map, lock: Lock):
-    K8sconfig.load_kube_config(config_file="/etc/kubernetes/kubelet.conf")
-    node_selector = f"spec.nodeName={socket.gethostname()}"
-    for event in Watch().stream(CoreV1Api().list_namespaced_pod, namespace="default", field_selector=node_selector):
+    K8sconfig.load_kube_config(config_file='/etc/kubernetes/kubelet.conf')
+    node_selector = f'spec.nodeName={socket.gethostname()}'
+    for event in Watch().stream(CoreV1Api().list_namespaced_pod, namespace='default', field_selector=node_selector):
         # the other event types are not usefull
         if type(event) != dict:
             continue
@@ -106,5 +106,5 @@ def containers_manager(ebpf_map, lock: Lock):
 if __name__ == '__main__':
     lock = Lock()
     ebpf_map = recreate_ebpf_map()
-    BpfProbe(valid_containers, 2, "/sys/fs/bpf/mnt_ns_set", lock)
+    BpfProbe(valid_containers, '/sys/fs/bpf/mnt_ns_set', lock)
     containers_manager(ebpf_map, lock)

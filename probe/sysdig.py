@@ -49,6 +49,7 @@ class SysdigProbe:
         # Keep stderr drained so sysdig never blocks on a full pipe; also useful for debugging
         if not self._proc or not self._proc.stderr:
             return
+
         while not self._stop_event.is_set():
             # print(f"Error: {self._proc.stderr.readline()}")
             if self._stop_event.is_set():

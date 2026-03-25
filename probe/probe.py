@@ -50,11 +50,10 @@ class ContainerFilter:
 class BpfProbe:
     """Attaches to specific containers for probing"""
 
-    def __init__(self, queues: dict[int, BpfContainer], window_size: int, mntnsmap: str, lock: Lock):
+    def __init__(self, queues: dict[int, BpfContainer], mntnsmap: str, lock: Lock):
         args = ContainerFilter(mntnsmap)
         bpf = filter_by_containers(args) + bpf_program
-        self.bpf = BPF(text=bpf, cflags=["-Wno-microsoft-anon-tag", "-fms-extensions"])
-        self.window_size = window_size
+        self.bpf = BPF(text=bpf, cflags=['-Wno-microsoft-anon-tag', '-fms-extensions'])
         self.queues = queues
         self.lock = lock
         self.thread = Thread(target=self.monitor, daemon=True)
@@ -62,13 +61,13 @@ class BpfProbe:
 
     def monitor(self):
         def handle_event(cpu, data, size):
-            event = self.bpf["events"].event(data)
+            event = self.bpf['events'].event(data)
             with self.lock:
                 if event.mnt_ns_id in self.queues:
                     self.queues[event.mnt_ns_id].queue.put((event.tid, event.sid), block=True)
 
         # register callback
-        self.bpf["events"].open_ring_buffer(handle_event)
+        self.bpf['events'].open_ring_buffer(handle_event)
 
         # event-driven loop (blocks until new data)
         while True:
@@ -76,4 +75,4 @@ class BpfProbe:
             self.bpf.ring_buffer_poll()
 
     def stop(self):
-        self.bpf.detach_tracepoint(b"raw_syscalls:sys_exit")
+        self.bpf.detach_tracepoint(b'raw_syscalls:sys_exit')
