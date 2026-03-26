@@ -1,16 +1,13 @@
+from models import BpfTrackedContainer, BpfProbe, BpfTrackedContainersRegistry
 from kubernetes import config as K8sconfig
 from kubernetes.client import CoreV1Api
-from models.bpf import BpfContainer
 import socket, os, subprocess, json
 from kubernetes.watch import Watch
-from threading import Lock
-from probe import BpfProbe
-from probe.bcc import BPF
 from queue import Queue
 from utils import FILES
+from probe import BPF
 
-# maps namespace ids to the containers themselves
-valid_containers: dict[int, BpfContainer] = {}
+container_registry: BpfTrackedContainersRegistry = BpfTrackedContainersRegistry()
 valid_images = {
     'yaml_load:v1': 'YamlLoad_5s_w2_20p',
     'sentiment_analyzer:v1': 'SentimentAnalyzer_5s_w2_10p'
@@ -25,44 +22,30 @@ def recreate_ebpf_map():
     return bpf.get_table('mnt_ns_set')
 
 # TODO: what if this fails?
-def add_container(ebpf_map, image: str, container_id: str, queue: Queue[tuple[int, int]], lock: Lock):
+def add_container(ebpf_map, image: str, container_id: str):
     # get the PID from the local container runtime and the respective namespace id
     result = subprocess.run(['crictl', 'inspect', container_id], capture_output=True, text=True, check=True)
     container_pid = json.loads(result.stdout)['info']['pid']
     ns_id = os.stat(f'/proc/{container_pid}/ns/mnt').st_ino
 
     model_path = FILES / (valid_images[image] + '.pkl')
-    with lock:
-        # don't re-add the same container
-        if ns_id in valid_containers:
-            return
-
-        valid_containers[ns_id] = BpfContainer(image, container_id, model_path, queue)
+    container_registry.add_container(ns_id, BpfTrackedContainer(image, container_id, model_path, Queue(maxsize=1000)))
 
     key = ebpf_map.Key(ns_id)
     value = ebpf_map.Leaf(0)
     ebpf_map[key] = value
     print(f'[+] Container created with image: {image}')
 
-def remove_container(ebpf_map, container_id: str, lock: Lock):
-    ns_id = None
-    with lock:
-        for c_ns_id, c in valid_containers.items():
-            if c.container_id == container_id:
-                ns_id = c_ns_id
-                break
-
-        if ns_id == None:
-            return
-
-        valid_containers[ns_id].stop()
-        del valid_containers[ns_id]
+def remove_container(ebpf_map, container_id: str):
+    ns_id = container_registry.remove_container(container_id)
+    if ns_id == None:
+        return
 
     key = ebpf_map.Key(ns_id)
     del ebpf_map[key]
     print('[+] Container removed')
 
-def containers_manager(ebpf_map, lock: Lock):
+def containers_manager(ebpf_map):
     K8sconfig.load_kube_config(config_file='/etc/kubernetes/kubelet.conf')
     node_selector = f'spec.nodeName={socket.gethostname()}'
     for event in Watch().stream(CoreV1Api().list_namespaced_pod, namespace='default', field_selector=node_selector):
@@ -98,13 +81,12 @@ def containers_manager(ebpf_map, lock: Lock):
 
         event_type = event['type']
         if event_type in ('ADDED', 'MODIFIED') and pod.status.phase == 'Running' and pod.metadata.deletion_timestamp is None:
-            add_container(ebpf_map, container_image, container_id, Queue(maxsize=1000), lock)
+            add_container(ebpf_map, container_image, container_id)
 
         elif event_type == 'MODIFIED' and pod.metadata.deletion_timestamp is not None:
-            remove_container(ebpf_map, container_id, lock)
+            remove_container(ebpf_map, container_id)
 
 if __name__ == '__main__':
-    lock = Lock()
     ebpf_map = recreate_ebpf_map()
-    BpfProbe(valid_containers, '/sys/fs/bpf/mnt_ns_set', lock)
-    containers_manager(ebpf_map, lock)
+    BpfProbe(container_registry, '/sys/fs/bpf/mnt_ns_set')
+    containers_manager(ebpf_map)

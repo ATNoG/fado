@@ -1,9 +1,6 @@
-import asyncio
-import random
-import requests
-import threading
-from utils.abstract_scenario import BaseSimulation
 import scenarios.log4shell.sim.build_servers as bs
+from models.base_simulation import BaseSimulation
+import asyncio, random, requests, threading
 
 class LOG4SHELL(BaseSimulation):
     def __init__(self):
@@ -22,14 +19,13 @@ class LOG4SHELL(BaseSimulation):
         print("Starting LDAP Server")
         self.ldap_proc = bs.start_ldap_server()
 
-
     @property
     def name(self) -> str:
         return "LOG4SHELL"
-    
+
     def get_data_dir(self):
         return "log4shell"
-    
+
     async def worker(self, session):
         await asyncio.sleep(random.uniform(0, 5))
         ua = random.choice(self.user_agents)
@@ -53,5 +49,5 @@ class LOG4SHELL(BaseSimulation):
             print(f"[!] Request failed: {e}")
 
     def cleanup(self):
-        self.ldap_proc.terminate()
-
+        if self.ldap_proc != None:
+            self.ldap_proc.terminate()

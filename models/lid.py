@@ -1,8 +1,8 @@
+from probe.bcc.syscall import syscalls
+from typing import Dict, List, Tuple
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple
-from probe.bcc.syscall import syscalls
 
 @dataclass(frozen=True)
 class Event:

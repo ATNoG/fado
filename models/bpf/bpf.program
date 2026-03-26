@@ -1,0 +1,35 @@
+struct syscall_data{
+    u64 ts;
+    u32 tid;
+    u32 sid;
+    u64 mnt_ns_id;
+};
+
+BPF_RINGBUF_OUTPUT(events, 1); // 4KB ring buffer
+
+TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
+    if (container_should_be_filtered()) {
+        return 0;
+    }
+
+    u32 key = args->id;
+    if (key > 334) {
+        key = 335;
+    }
+
+    // ignore futex syscalls
+    if (key == 202) {
+        return 0;
+    }
+
+    struct syscall_data sdata = {};
+    sdata.ts  = bpf_ktime_get_ns();
+    sdata.tid = bpf_get_current_pid_tgid();
+    sdata.sid = key;
+
+    struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+    sdata.mnt_ns_id = task->nsproxy->mnt_ns->ns.inum;
+
+    events.ringbuf_output(&sdata, sizeof(sdata), 0);
+    return 0;
+}

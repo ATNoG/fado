@@ -1,6 +1,5 @@
-from models.bpf import BpfContainer
+from models import BpfProbe, BpfTrackedContainer
 from threading import Lock
-from probe import BpfProbe
 from probe.bcc import BPF
 from utils import FILES
 from queue import Queue
@@ -8,19 +7,19 @@ import docker, os
 
 # TODO: this NEEDS to be started before any containers starts or those first containers will NOT be monitored (needs to be fixed)
 
-valid_containers: dict[int, BpfContainer] = {}
+valid_containers: dict[int, BpfTrackedContainer] = {}
 client = docker.DockerClient()
 valid_images = {
     'yaml_load': 'YamlLoad_5s_w2_20p'
 }
 
 def recreate_ebpf_map():
-    if os.path.exists("/sys/fs/bpf/mnt_ns_set"):
-        os.remove("/sys/fs/bpf/mnt_ns_set")
+    if os.path.exists('/sys/fs/bpf/mnt_ns_set'):
+        os.remove('/sys/fs/bpf/mnt_ns_set')
 
     bpf = BPF(text="""BPF_TABLE_PINNED("hash", u64, u32, mnt_ns_set, 128, "/sys/fs/bpf/mnt_ns_set");""")
-    print("[+] eBPF map is setup...")
-    return bpf.get_table("mnt_ns_set")
+    print('[+] eBPF map is setup...')
+    return bpf.get_table('mnt_ns_set')
 
 def add_container(ebpf_map, image: str, container_id: str, queue: Queue[tuple[int, int]], lock: Lock):
     # TODO: what if this fails somehow?
@@ -29,12 +28,12 @@ def add_container(ebpf_map, image: str, container_id: str, queue: Queue[tuple[in
 
     model_path = FILES / (valid_images[image] + '.pkl')
     with lock:
-        valid_containers[ns_id] = BpfContainer(image, container_id, model_path, queue)
+        valid_containers[ns_id] = BpfTrackedContainer(image, container_id, model_path, queue)
 
     key = ebpf_map.Key(ns_id)
     value = ebpf_map.Leaf(0)
     ebpf_map[key] = value
-    print("[+] Container created")
+    print('[+] Container created')
 
 def remove_container(ebpf_map, container_id: str, lock: Lock):
     ns_id = None
@@ -52,7 +51,7 @@ def remove_container(ebpf_map, container_id: str, lock: Lock):
 
     key = ebpf_map.Key(ns_id)
     del ebpf_map[key]
-    print("[+] Container removed")
+    print('[+] Container removed')
 
 def containers_manager(ebpf_map, lock: Lock):
     for event in client.events(decode=True):
@@ -72,5 +71,5 @@ def containers_manager(ebpf_map, lock: Lock):
 if __name__ == '__main__':
     lock = Lock()
     ebpf_map = recreate_ebpf_map()
-    BpfProbe(valid_containers, 2, "/sys/fs/bpf/mnt_ns_set", lock)
+    BpfProbe(valid_containers, '/sys/fs/bpf/mnt_ns_set', lock)
     containers_manager(ebpf_map, lock)

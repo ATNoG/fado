@@ -1,5 +1,4 @@
-import pandas as pd
-import sys
+import sys, pandas as pd
 
 def cleanup(baseline, data):
     baseline = pd.read_csv(baseline, header=None)
@@ -23,7 +22,7 @@ def cleanup(baseline, data):
 
     # Count how many labels were changed
     changes = (test_labels != corrected_labels).sum()
-    print(f"Number of labels changed: {changes}")
+    print(f'Number of labels changed: {changes}')
 
     # Recombine features + updated labels
     test_updated = test_features.copy()
@@ -31,7 +30,7 @@ def cleanup(baseline, data):
 
     # Save result
     test_updated.to_csv(data, header=False, index=False)
-    print(f"Saved cleaned file to {data}")
+    print(f'Saved cleaned file to {data}')
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     cleanup(sys.argv[1], sys.argv[2])

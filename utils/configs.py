@@ -1,3 +1,4 @@
+# TODO: maybe create a 'configs' folder for this? and turn this into a json file?
 from pathlib import Path
 
 TOLERANCE = 0.6

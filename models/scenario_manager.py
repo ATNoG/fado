@@ -1,5 +1,5 @@
 from scenarios import yaml_load, sentiment_analyzer, log4shell
-from .abstract_scenario import BaseSimulation
+from .base_simulation import BaseSimulation
 from enum import Enum
 
 class Scenario(Enum):

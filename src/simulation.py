@@ -1,14 +1,14 @@
-from utils import BaseSimulation, Scenario, ScenarioManager, DB
+from models import BaseSimulation, Scenario, ScenarioManager, BpfProbe
 from multiprocessing import Process, Event
 from .cleanup_data import cleanup
 from random import random
-from probe import BpfProbe
 from queue import Queue
 from time import sleep
+from utils import DB
 from sys import exit
 import os
 
-def monitor_data(scenario: BaseSimulation, data_path: str, stop_sim, exploit_flag, mntns: str, window_size:int, limit: int):
+def monitor_data(scenario: BaseSimulation, data_path: str, stop_sim, exploit_flag, mntns: str, window_size: int, limit: int):
     output = open(data_path, "w")
     counter = 0
     queue = Queue(maxsize=1000)

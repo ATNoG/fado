@@ -6,7 +6,7 @@ from pathlib import Path
 from pickle import load
 from queue import Queue
 
-class BpfContainer:
+class BpfTrackedContainer:
     """Represents a container being tracked by eBPF"""
 
     def __init__(self, image: str, container_id: str, model_path: Path, queue: Queue[tuple[int, int]]):

@@ -1,21 +1,17 @@
-import asyncio
-import aiohttp
-import os
-import requests
-import random
-from utils.abstract_scenario import BaseSimulation
+from models.base_simulation import BaseSimulation
+import asyncio, aiohttp, os, requests, random
 
 class YAML_Load(BaseSimulation):
     @property
     def name(self) -> str:
         return "YAML_Unsafe_Load"
-    
+
     def get_data_dir(self):
-        return "yaml_load" 
-    
+        return "yaml_load"
+
     def cleanup(self):
         pass
-    
+
     async def worker(self, session:aiohttp.ClientSession):
         await asyncio.sleep(random.uniform(0, 5))
         base_dir = os.path.dirname(os.path.abspath(__file__))

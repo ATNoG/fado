@@ -1,8 +1,9 @@
+from argparse import ArgumentParser, RawDescriptionHelpFormatter, BooleanOptionalAction
 from sys import exit
-import argparse
 
+# TODO: maybe this should use the local docker tracing instead or Knative for simplicity?
 def main():
-    parser = argparse.ArgumentParser(description="Trace container syscalls", formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = ArgumentParser(description="Trace container syscalls", formatter_class=RawDescriptionHelpFormatter)
 
     parser.add_argument("-sc", "--scenario",
         help="""Scenario to use:
@@ -28,7 +29,7 @@ def main():
     parser.add_argument("-e", "--exploit",
         help="Trigger exploit during simulation (default: disabled).",
         default=False,
-        action=argparse.BooleanOptionalAction
+        action=BooleanOptionalAction
     )
 
     parser.add_argument("--mntnsmap",

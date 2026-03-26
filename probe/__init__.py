@@ -1,2 +1,3 @@
+from .bcc.containers import filter_by_containers
 from .sysdig import SysdigProbe
-from .probe import BpfProbe
+from .bcc import BPF

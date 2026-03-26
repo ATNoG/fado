@@ -1,9 +1,16 @@
-from hmmlearn.hmm import CategoricalHMM
-from hmmlearn.base import ConvergenceMonitor
-import os, pickle, numpy as np
-from collections import deque
-from time import time_ns, time
+from sklearn.metrics import confusion_matrix, accuracy_score, classification_report
 from utils import STATS, FIGS, FILES, DB, TOLERANCE, WHITELIST_FREQUENCY
+from hmmlearn.base import ConvergenceMonitor
+from matplotlib.ticker import EngFormatter
+from hmmlearn.hmm import CategoricalHMM
+from matplotlib.colors import LogNorm
+import matplotlib.pyplot as plt
+import os, pickle, numpy as np
+from time import time_ns, time
+from collections import deque
+from tqdm import tqdm
+import seaborn as sns
+import pandas as pd
 
 class EarlyStop(ConvergenceMonitor):
     def __init__(self, n_iter=100, tol=1e-2, patience=5, verbose=False):
@@ -50,9 +57,6 @@ class HMM:
             self.model.monitor_ = EarlyStop(self.model.n_iter, 0.1, 5, True)
 
     def train(self, train_data):
-        from tqdm import tqdm
-        import pandas as pd
-
         train_data = os.path.join(DB, train_data.removesuffix(".csv")) + ".csv"
         train_data = pd.read_csv(train_data, header=None)
         train_data.drop(train_data.columns[-1], axis=1, inplace=True)
@@ -127,14 +131,6 @@ class HMM:
             pickle.dump({'model': self.model, 'threshold': self.threshold, 'window_size': self.window_size, 'whitelist': self.whitelist}, f)
 
     def test(self, test_data):
-        import seaborn as sns
-        from tqdm import tqdm
-        import pandas as pd
-        import matplotlib.pyplot as plt
-        from matplotlib.ticker import EngFormatter
-        from matplotlib.colors import LogNorm
-        from sklearn.metrics import confusion_matrix, accuracy_score, classification_report
-
         test_data = os.path.join(DB, test_data) + ".csv"
         test_data = pd.read_csv(test_data, header=None)
         flags = test_data.iloc[:, -1].copy()

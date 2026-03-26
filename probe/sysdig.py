@@ -1,5 +1,7 @@
 import subprocess, threading, time
 
+# TODO: should this be in 'models'?
+# TODO: what is this used for?? if anything
 class SysdigProbe:
     def __init__(self, container_id: str, sysdig_path: str = 'sysdig', extra_filter: str | None = None):
         if not container_id:
