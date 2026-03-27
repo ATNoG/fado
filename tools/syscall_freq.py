@@ -1,7 +1,6 @@
 from collections import Counter
-from utils import DB
-import pandas as pd
-import os
+import os, pandas as pd
+from config import DB
 
 # --- Read and preprocess data ---
 

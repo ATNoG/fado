@@ -1,13 +1,12 @@
-from models import BpfProbe, BpfTrackedContainer
-from threading import Lock
+from models import BpfTrackedContainer, BpfProbe, BpfTrackedContainersRegistry
 from probe.bcc import BPF
-from utils import FILES
+from config import FILES
 from queue import Queue
 import docker, os
 
 # TODO: this NEEDS to be started before any containers starts or those first containers will NOT be monitored (needs to be fixed)
 
-valid_containers: dict[int, BpfTrackedContainer] = {}
+container_registry: BpfTrackedContainersRegistry = BpfTrackedContainersRegistry()
 client = docker.DockerClient()
 valid_images = {
     'yaml_load': 'YamlLoad_5s_w2_20p'
@@ -21,55 +20,43 @@ def recreate_ebpf_map():
     print('[+] eBPF map is setup...')
     return bpf.get_table('mnt_ns_set')
 
-def add_container(ebpf_map, image: str, container_id: str, queue: Queue[tuple[int, int]], lock: Lock):
+def add_container(ebpf_map, image: str, container_id: str):
     # TODO: what if this fails somehow?
     container_pid = client.containers.get(container_id).attrs['State']['Pid']
     ns_id = os.stat(f'/proc/{container_pid}/ns/mnt').st_ino
 
     model_path = FILES / (valid_images[image] + '.pkl')
-    with lock:
-        valid_containers[ns_id] = BpfTrackedContainer(image, container_id, model_path, queue)
+    if not container_registry.add_container(ns_id, BpfTrackedContainer(image, container_id, model_path, Queue(maxsize=1000), apply_policies=False)):
+        return
 
     key = ebpf_map.Key(ns_id)
     value = ebpf_map.Leaf(0)
     ebpf_map[key] = value
     print('[+] Container created')
 
-def remove_container(ebpf_map, container_id: str, lock: Lock):
-    ns_id = None
-    with lock:
-        for c_ns_id, c in valid_containers.items():
-            if c.container_id == container_id:
-                ns_id = c_ns_id
-                break
-
-        if ns_id == None:
-            return
-
-        valid_containers[ns_id].stop()
-        del valid_containers[ns_id]
+def remove_container(ebpf_map, container_id: str):
+    ns_id = container_registry.remove_container(container_id)
+    if ns_id == None:
+        return
 
     key = ebpf_map.Key(ns_id)
     del ebpf_map[key]
     print('[+] Container removed')
 
-def containers_manager(ebpf_map, lock: Lock):
+def containers_manager(ebpf_map):
     for event in client.events(decode=True):
         if event['Type'] == 'container':
             container_action = event['Action']
             container_image = event['Actor']['Attributes']['image']
             container_id = event['Actor']['ID']
 
-            # TODO: does it make sense to assert that this container is not in the `valid_containers` list??
             if container_action == 'start' and container_image in valid_images:
-                add_container(ebpf_map, container_image, container_id, Queue(maxsize=1000), lock)
+                add_container(ebpf_map, container_image, container_id)
 
-            # TODO: this seems to run more than once when a containers is getting terminated. why?
             elif container_action in ('die', 'stop', 'kill'):
-                remove_container(ebpf_map, container_id, lock)
+                remove_container(ebpf_map, container_id)
 
 if __name__ == '__main__':
-    lock = Lock()
     ebpf_map = recreate_ebpf_map()
-    BpfProbe(valid_containers, '/sys/fs/bpf/mnt_ns_set', lock)
-    containers_manager(ebpf_map, lock)
+    BpfProbe(container_registry, '/sys/fs/bpf/mnt_ns_set')
+    containers_manager(ebpf_map)

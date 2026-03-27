@@ -7,16 +7,18 @@ class BpfTrackedContainersRegistry:
         self.containers: dict[int, BpfTrackedContainer] = {}
         self.lock = Lock()
 
-    def add_container(self, namespace_id: int, container: BpfTrackedContainer):
+    def add_container(self, namespace_id: int, container: BpfTrackedContainer) -> bool:
         """Adds a new container with a specific namespace id.  
         Does nothing if the namespace id is already present."""
 
         with self.lock:
             # don't re-add the same container
             if namespace_id in self.containers:
-                return
+                return False
 
             self.containers[namespace_id] = container
+
+        return True
 
     def remove_container(self, container_id: str) -> int | None:
         """Removes a container with a specific container id.  

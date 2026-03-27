@@ -1,5 +1,5 @@
 from sklearn.metrics import confusion_matrix, accuracy_score, classification_report
-from utils import STATS, FIGS, FILES, DB, TOLERANCE, WHITELIST_FREQUENCY
+from config import STATS, FIGS, FILES, DB, TOLERANCE, WHITELIST_FREQUENCY
 from hmmlearn.base import ConvergenceMonitor
 from matplotlib.ticker import EngFormatter
 from hmmlearn.hmm import CategoricalHMM

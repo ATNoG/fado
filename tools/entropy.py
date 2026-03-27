@@ -1,9 +1,7 @@
+import os, numpy as np, pandas as pd
 from collections import Counter
 import matplotlib.pyplot as plt
-from utils import DB
-import pandas as pd
-import numpy as np
-import os
+from config import DB
 
 csv_files = ["baseline_Log4Shell_3", "baseline_Log4Shell_4", "baseline_Log4Shell_10"]
 all_freqs = {}

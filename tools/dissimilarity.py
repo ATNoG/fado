@@ -1,8 +1,6 @@
+import os, numpy as np, pandas as pd
 import matplotlib.pyplot as plt
-from utils import DB
-import pandas as pd
-import numpy as np
-import os
+from config import DB
 
 windows = [2, 3, 4, 6, 8, 10]
 scenarios = [

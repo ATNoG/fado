@@ -1,18 +1,21 @@
+from models import SecurityAlert, AlertSeverity, SecurityMeasure
+from config import TOLERANCE, POLICY_CONTROLLER
 from numpy import isneginf, array as np_array
 from collections import defaultdict, deque
 from threading import Thread, Event
-from utils import TOLERANCE
 from pathlib import Path
 from pickle import load
 from queue import Queue
+import requests
 
 class BpfTrackedContainer:
     """Represents a container being tracked by eBPF"""
 
-    def __init__(self, image: str, container_id: str, model_path: Path, queue: Queue[tuple[int, int]]):
+    def __init__(self, image: str, container_id: str, model_path: Path, queue: Queue[tuple[int, int]], apply_policies=True):
         self.image = image
         self.container_id = container_id
         self.queue = queue
+        self.apply_policies = apply_policies
         self.thread_event = Event()
         self.thread = Thread(target=self.get_windows, daemon=True)
         self.thread.start()
@@ -49,7 +52,9 @@ class BpfTrackedContainer:
                 results.append(self.run_model(windows[tid]))
 
                 if sum(results) > len(results) * TOLERANCE:
-                    print('Anomaly detected')
+                    print('[-] Anomaly detected')
+                    if self.apply_policies:
+                        self.apply_policy()
 
     def run_model(self, window: list[int]) -> int:
         # data = []
@@ -65,3 +70,15 @@ class BpfTrackedContainer:
         seq = np_array(window).reshape(-1,1)
         score = self.model.score(seq, [len(window)])
         return (1 if score < self.threshold or isneginf(score) else 0)
+
+    def apply_policy(self):
+        try:
+            # TODO: get node and pod names
+            security_alert = SecurityAlert(node_name="", pod_name="", container_id=self.container_id, severity=AlertSeverity.High)
+            response = requests.post(POLICY_CONTROLLER, json=security_alert.model_dump(), timeout=2)
+            response.raise_for_status()
+
+            # TODO: apply the policy
+            security_measure = SecurityMeasure(**response.json())
+        except:
+            print('[WARNING] Could not get/apply policy for anomaly!')

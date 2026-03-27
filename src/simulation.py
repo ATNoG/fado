@@ -1,10 +1,10 @@
 from models import BaseSimulation, Scenario, ScenarioManager, BpfProbe
 from multiprocessing import Process, Event
-from .cleanup_data import cleanup
+from src.cleanup_data import cleanup
 from random import random
 from queue import Queue
 from time import sleep
-from utils import DB
+from config import DB
 from sys import exit
 import os
 

@@ -3,8 +3,8 @@ from kubernetes import config as K8sconfig
 from kubernetes.client import CoreV1Api
 import socket, os, subprocess, json
 from kubernetes.watch import Watch
+from config import FILES
 from queue import Queue
-from utils import FILES
 from probe import BPF
 
 container_registry: BpfTrackedContainersRegistry = BpfTrackedContainersRegistry()
@@ -29,7 +29,8 @@ def add_container(ebpf_map, image: str, container_id: str):
     ns_id = os.stat(f'/proc/{container_pid}/ns/mnt').st_ino
 
     model_path = FILES / (valid_images[image] + '.pkl')
-    container_registry.add_container(ns_id, BpfTrackedContainer(image, container_id, model_path, Queue(maxsize=1000)))
+    if not container_registry.add_container(ns_id, BpfTrackedContainer(image, container_id, model_path, Queue(maxsize=1000))):
+        return
 
     key = ebpf_map.Key(ns_id)
     value = ebpf_map.Leaf(0)
