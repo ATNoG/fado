@@ -1,4 +1,4 @@
-from models import BpfTrackedContainersRegistry
+from .bpf_tracked_containers_registry import BpfTrackedContainersRegistry
 from probe import BPF, filter_by_containers
 from dataclasses import dataclass
 from threading import Thread
@@ -14,7 +14,7 @@ class BpfProbe:
 
     def __init__(self, container_registry: BpfTrackedContainersRegistry, mntnsmap: str):
         args = self.BpfProbeFilter(mntnsmap)
-        bpf = filter_by_containers(args) + open('./bpf.program', 'r').read()
+        bpf = filter_by_containers(args) + open('./models/bpf/bpf.program', 'r').read()
         self.bpf = BPF(text=bpf, cflags=['-Wno-microsoft-anon-tag', '-fms-extensions'])
         self.container_registry = container_registry
         self.thread = Thread(target=self.monitor, daemon=True)

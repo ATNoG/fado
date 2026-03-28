@@ -1,19 +1,21 @@
-from models import SecurityAlert, AlertSeverity, SecurityMeasure
+from ..security_alert import SecurityAlert, AlertSeverity, SecurityMeasure
 from config import TOLERANCE, POLICY_CONTROLLER
 from numpy import isneginf, array as np_array
 from collections import defaultdict, deque
 from threading import Thread, Event
+import requests, subprocess
 from pathlib import Path
 from pickle import load
 from queue import Queue
-import requests
 
 class BpfTrackedContainer:
     """Represents a container being tracked by eBPF"""
 
-    def __init__(self, image: str, container_id: str, model_path: Path, queue: Queue[tuple[int, int]], apply_policies=True):
+    def __init__(self, image: str, container_id: str, model_path: Path, pod_name: str, node_name: str, queue: Queue[tuple[int, int]], apply_policies=True):
         self.image = image
         self.container_id = container_id
+        self.pod_name = pod_name
+        self.node_name = node_name
         self.queue = queue
         self.apply_policies = apply_policies
         self.thread_event = Event()
@@ -30,8 +32,11 @@ class BpfTrackedContainer:
 
     def stop(self):
         # wake up the thread (with dummy values) just in case it is stuck waiting for queue events
-        self.queue.put((-1, -1))
-        self.thread_event.set()
+        if not self.thread_event.is_set():
+            self.queue.put((-1, -1))
+            self.thread_event.set()
+
+        print("asdsadsadd")
         self.thread.join()
 
     def get_windows(self):
@@ -53,8 +58,8 @@ class BpfTrackedContainer:
 
                 if sum(results) > len(results) * TOLERANCE:
                     print('[-] Anomaly detected')
-                    if self.apply_policies:
-                        self.apply_policy()
+                    if self.apply_policies and self.apply_policy():
+                        self.thread_event.set()
 
     def run_model(self, window: list[int]) -> int:
         # data = []
@@ -71,14 +76,25 @@ class BpfTrackedContainer:
         score = self.model.score(seq, [len(window)])
         return (1 if score < self.threshold or isneginf(score) else 0)
 
-    def apply_policy(self):
+    def apply_policy(self) -> bool:
+        # TODO: what to do with the thread after applying the policy??
         try:
-            # TODO: get node and pod names
-            security_alert = SecurityAlert(node_name="", pod_name="", container_id=self.container_id, severity=AlertSeverity.High)
-            response = requests.post(POLICY_CONTROLLER, json=security_alert.model_dump(), timeout=2)
+            security_alert = SecurityAlert(node_name=self.node_name, pod_name=self.pod_name, container_id=self.container_id, severity=AlertSeverity.High)
+            response = requests.post(f'{POLICY_CONTROLLER}/api/alerts', json=security_alert.model_dump(mode='json'), timeout=2)
             response.raise_for_status()
 
-            # TODO: apply the policy
-            security_measure = SecurityMeasure(**response.json())
-        except:
+            security_measure = SecurityMeasure(response.json())
+            match security_measure:
+                case SecurityMeasure.Nothing:
+                    pass
+                case SecurityMeasure.Kill:
+                    subprocess.run(['crictl', 'stop', '--timeout', '0', self.container_id], capture_output=True, text=True, check=True)
+                    print('Got "kill" as a security policy')
+                    return True
+                case _:
+                    raise RuntimeError('Invalid SecurityMeasure value.')
+        except Exception as e:
+            print(e)
             print('[WARNING] Could not get/apply policy for anomaly!')
+
+        return False

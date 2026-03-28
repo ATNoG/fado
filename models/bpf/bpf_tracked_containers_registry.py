@@ -1,4 +1,4 @@
-from models import BpfTrackedContainer
+from .bpf_tracked_container import BpfTrackedContainer
 from threading import Lock
 from queue import Queue
 
@@ -48,3 +48,16 @@ class BpfTrackedContainersRegistry:
                 return self.containers[namespace_id].queue
 
         return None
+
+    def get_pod_container_id(self, pod_name) -> str | None:
+        """Get the container id running in a specific pod if it exists."""
+        with self.lock:
+            for c in self.containers.values():
+                if c.pod_name == pod_name:
+                    return c.container_id
+
+        return None
+
+    def tracks_pod(self, pod_name: str) -> bool:
+        """Returns a boolean indicating if a specific pod is tracked by this registry."""
+        return self.get_pod_container_id(pod_name) != None
