@@ -25,7 +25,12 @@ class BpfProbe:
             event = self.bpf['events'].event(data)
             queue = self.container_registry.get_container_queue(event.mnt_ns_id)
             if queue != None:
-                queue.put((event.tid, event.sid), block=True)
+                try:
+                    # TODO: does it make sense to use a timeout here??
+                    # we cannot hold the probe back if some consumer thread decides to hang or is just too slow
+                    queue.put((event.tid, event.sid), block=False, timeout=None)
+                except:
+                    pass
 
         # register callback
         self.bpf['events'].open_ring_buffer(handle_event)

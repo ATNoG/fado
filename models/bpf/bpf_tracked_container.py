@@ -31,22 +31,16 @@ class BpfTrackedContainer:
             self.whitelist = saved_data['whitelist']
 
     def stop(self):
-        # wake up the thread (with dummy values) just in case it is stuck waiting for queue events
-        if not self.thread_event.is_set():
-            self.queue.put((-1, -1))
-            self.thread_event.set()
-
-        print("asdsadsadd")
+        self.thread_event.set()
         self.thread.join()
 
     def get_windows(self):
         windows = defaultdict(list[int])
         results = deque([0] * 10, maxlen=10)
         while not self.thread_event.is_set():
-            tid, sid = self.queue.get(block=True, timeout=None)
-
-            # check for dummy wake up values
-            if tid == -1 and sid == -1:
+            try:
+                tid, sid = self.queue.get(block=True, timeout=0.1)
+            except:
                 continue
 
             windows[tid].append(sid)
@@ -59,7 +53,7 @@ class BpfTrackedContainer:
                 if sum(results) > len(results) * TOLERANCE:
                     print('[-] Anomaly detected')
                     if self.apply_policies and self.apply_policy():
-                        self.thread_event.set()
+                        return
 
     def run_model(self, window: list[int]) -> int:
         # data = []
