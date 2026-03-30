@@ -62,7 +62,7 @@ class HMM:
         train_data.drop(train_data.columns[-1], axis=1, inplace=True)
         self.window_size = train_data.shape[1]
 
-            # Numpy array (ensure contiguous)
+        # Numpy array (ensure contiguous)
         arr = np.ascontiguousarray(train_data.to_numpy())
         n_rows = arr.shape[0]
         if n_rows == 0:

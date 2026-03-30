@@ -65,21 +65,21 @@ sudo bpftool map dump pinned /sys/fs/bpf/mnt_ns_set
    - Exits unless `--train` or `--test` are also requested.  
 
 2. **Model Training (`--train`)**  
-   - Requires `--model_file` (where to save/load the model).  
+   - Requires `--model` (where to save/load the model).  
    - Requires train data file `--train`.  
    - Builds an HMM with parameters:  
      - Hidden states: `--states`  
      - Iterations: `--iterations`  
-   - Saves the trained model to `--model_file`.  
+   - Saves the trained model to `--model`.  
 
 3. **Model Testing (`--test`)**  
-   - Requires `--model_file` and `--test`.  
+   - Requires `--model` and `--test`.  
    - Loads the HMM from file.  
 
 4. **Live Tracing (default fallback)**  
    - If no `--simulation`, `--train`, or `--test` is specified:  
    - Attaches to kernel probes to trace syscalls in real-time.  
-   - Performs anomaly detection using `--model_file`.  
+   - Performs anomaly detection using `--model`.  
 
 > **Note:** The performance values presented in the associated document were obtained using a specialized venv with only the __hmmlearn__ lib installed. To allow its use, comment the first 2 lines [here](utils/__init__.py)
 
@@ -117,9 +117,8 @@ sudo venv/bin/python3 -m src.main -m hmm
 ## Directory Tree
 ```
 ├── data/                   # Containing generated files during training and testing
-|   ├── figs/               # Plots, figures
-|   ├── files/              # Saved models
 |   ├── logs/               # Generated data
+|   ├── models/             # Saved models
 |   └── stats/              # Model statistics
 ├── models/
 │   ├── __init__.py
@@ -129,7 +128,7 @@ sudo venv/bin/python3 -m src.main -m hmm
 │   ├── __init__.py
 │   └── probe.py            # Probe logic with filtering and processing
 ├── scenarios/              # Test scenarios
-│   ├── log4jpwn/           # S3
+│   ├── log4shell/          # S3
 │   ├── sentiment_analyzer/ # S1
 │   └── yaml_load/          # S2
 ├── tools/                  # Additional tools

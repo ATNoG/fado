@@ -1,32 +1,29 @@
 from models import BpfTrackedContainer, BpfProbe, BpfTrackedContainersRegistry
+from config import MODELS, IMAGE_MODEL_MAPPINGS, MNTNSMAP
 from probe.bcc import BPF
-from config import FILES
 from queue import Queue
 import docker, os
 
 # TODO: this NEEDS to be started before any containers starts or those first containers will NOT be monitored (needs to be fixed)
 
-container_registry: BpfTrackedContainersRegistry = BpfTrackedContainersRegistry()
 client = docker.DockerClient()
-valid_images = {
-    'yaml_load': 'YamlLoad_5s_w2_20p'
-}
 
-def recreate_ebpf_map():
-    if os.path.exists('/sys/fs/bpf/mnt_ns_set'):
-        os.remove('/sys/fs/bpf/mnt_ns_set')
+def recreate_ebpf_map(mntnsmap: str):
+    if os.path.exists(mntnsmap):
+        os.remove(mntnsmap)
 
-    bpf = BPF(text="""BPF_TABLE_PINNED("hash", u64, u32, mnt_ns_set, 128, "/sys/fs/bpf/mnt_ns_set");""")
+    bpf = BPF(text=f"""BPF_TABLE_PINNED("hash", u64, u32, mnt_ns_set, 128, "{mntnsmap}");""")
     print('[+] eBPF map is setup...')
     return bpf.get_table('mnt_ns_set')
 
-def add_container(ebpf_map, image: str, container_id: str):
+def add_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry, image: str, container_id: str, pod_name: str, node_name: str):
     # TODO: what if this fails somehow?
     container_pid = client.containers.get(container_id).attrs['State']['Pid']
     ns_id = os.stat(f'/proc/{container_pid}/ns/mnt').st_ino
 
-    model_path = FILES / (valid_images[image] + '.pkl')
-    if not container_registry.add_container(ns_id, BpfTrackedContainer(image, container_id, model_path, Queue(maxsize=1000), apply_policies=False)):
+    model_path = MODELS / (IMAGE_MODEL_MAPPINGS[f'{image}:v1'] + '.pkl')
+    bpf_tracked_container = BpfTrackedContainer(image, container_id, model_path, pod_name, node_name, Queue(maxsize=1000), apply_policies=False)
+    if not containers_registry.add_container(ns_id, bpf_tracked_container):
         return
 
     key = ebpf_map.Key(ns_id)
@@ -34,8 +31,8 @@ def add_container(ebpf_map, image: str, container_id: str):
     ebpf_map[key] = value
     print('[+] Container created')
 
-def remove_container(ebpf_map, container_id: str):
-    ns_id = container_registry.remove_container(container_id)
+def remove_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry, container_id: str):
+    ns_id = containers_registry.remove_container(container_id)
     if ns_id == None:
         return
 
@@ -43,20 +40,21 @@ def remove_container(ebpf_map, container_id: str):
     del ebpf_map[key]
     print('[+] Container removed')
 
-def containers_manager(ebpf_map):
+def containers_manager(ebpf_map, containers_registry: BpfTrackedContainersRegistry):
     for event in client.events(decode=True):
         if event['Type'] == 'container':
             container_action = event['Action']
             container_image = event['Actor']['Attributes']['image']
             container_id = event['Actor']['ID']
 
-            if container_action == 'start' and container_image in valid_images:
-                add_container(ebpf_map, container_image, container_id)
+            if container_action == 'start' and f'{container_image}:v1' in IMAGE_MODEL_MAPPINGS:
+                add_container(ebpf_map, containers_registry, container_image, container_id, 'docker_pod', 'docker_node')
 
             elif container_action in ('die', 'stop', 'kill'):
-                remove_container(ebpf_map, container_id)
+                remove_container(ebpf_map, containers_registry, container_id)
 
 if __name__ == '__main__':
-    ebpf_map = recreate_ebpf_map()
-    BpfProbe(container_registry, '/sys/fs/bpf/mnt_ns_set')
-    containers_manager(ebpf_map)
+    ebpf_map = recreate_ebpf_map(MNTNSMAP)
+    containers_registry = BpfTrackedContainersRegistry()
+    BpfProbe(containers_registry, MNTNSMAP)
+    containers_manager(ebpf_map, containers_registry)
