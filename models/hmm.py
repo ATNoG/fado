@@ -1,5 +1,5 @@
 from sklearn.metrics import confusion_matrix, accuracy_score, classification_report
-from config import STATS, FIGS, FILES, DB, TOLERANCE, WHITELIST_FREQUENCY
+from config import STATS, FIGS, MODELS, DB, TOLERANCE, WHITELIST_FREQUENCY
 from hmmlearn.base import ConvergenceMonitor
 from matplotlib.ticker import EngFormatter
 from hmmlearn.hmm import CategoricalHMM
@@ -35,7 +35,7 @@ class EarlyStop(ConvergenceMonitor):
 class HMM:
     def __init__(self, model_file, n_components=10, n_iter=10):
         self.n_features = 337
-        self.model_file = os.path.join(FILES, model_file) + ".pkl"
+        self.model_file = os.path.join(MODELS, model_file) + ".pkl"
         self.components = n_components
         self.iter = n_iter
         self.threshold = 0

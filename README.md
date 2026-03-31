@@ -138,7 +138,6 @@ sudo venv/bin/python3 -m src.main -m hmm
 │   ├── main.py             # Entry point
 │   ├── simulation.py       # Data Generation
 │   └── trace.py            # Dynamic Anomaly Detection
-├── utils/
 ├── README.md
 └── requirements.txt
 ```

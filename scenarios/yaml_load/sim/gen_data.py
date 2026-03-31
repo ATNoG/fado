@@ -212,20 +212,21 @@ def generate_varied_yaml(index):
                 "message": f"Operation {i} completed"
             }
         },
-    lambda i: {
-            "data": [
-                {"id": i, "value": choice([True, False, None, randint(0, 100)])},
-                {"id": i+1, "value": choice([True, False, None, randint(0, 100)])}
-            ]
+        lambda i: {
+                "data": [
+                    {"id": i, "value": choice([True, False, None, randint(0, 100)])},
+                    {"id": i+1, "value": choice([True, False, None, randint(0, 100)])}
+                ]
         }
     ]
-    
+
     chosen_generators = sample(options, k=randint(1, 8))
     combined_result = {}
 
     for gen in chosen_generators:
         part = gen(index)
         combined_result.update(part)
+
     return combined_result
 
 def gen_data(dirName, ndocs = 151):
@@ -235,4 +236,3 @@ def gen_data(dirName, ndocs = 151):
         filename = f"{i:02d}_varied.yaml"
         with open(f"{dirName}/{filename}", "w", encoding="utf-8") as f:
             f.write(yaml_content)
-

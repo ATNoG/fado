@@ -5,7 +5,7 @@ import random
 
 class BaseSimulation(ABC):
     def __init__(self):
-        self.exploit = False
+        self.run_exploit = False
 
     @property
     def name(self) -> str:
@@ -14,18 +14,18 @@ class BaseSimulation(ABC):
     @property
     def syscallDir(self) -> str:
         fileName = self.get_data_dir()
-        return f"{fileName}{"_exploit" if self.exploit else ""}"
+        return f"{fileName}{"_exploit" if self.run_exploit else ""}"
 
-    def simulate(self, duration, stop_sim, exploit=False) -> None:
-        asyncio.run(self.trigger_api(duration, stop_sim, exploit=exploit))
+    def simulate(self, duration: int, stop_sim, run_exploit: bool) -> None:
+        asyncio.run(self.trigger_api(duration, stop_sim, run_exploit))
 
-    async def trigger_api(self, sim_time, stop_sim, exploit=False):
+    async def trigger_api(self, sim_time, stop_sim, run_exploit: bool):
         if sim_time:
             stop_time = time() + sim_time
         else:
             stop_time = None
         connector = aiohttp.TCPConnector(limit=0, force_close=True)
-        concurrency = random.randint(1,50) if not exploit else random.randint(20,150)
+        concurrency = random.randint(1,50) if not run_exploit else random.randint(20,150)
 
         async with aiohttp.ClientSession(connector=connector, timeout=aiohttp.ClientTimeout(total=10), auto_decompress=True) as session:
             start_time = time()
@@ -42,7 +42,7 @@ class BaseSimulation(ABC):
                     elapsed = int(time() - start_time)
                     remaining = int(stop_time - time())
                     print(f"\rActive: {len(tasks)} | Elapsed: {elapsed}s | Remaining: {remaining}s")
-                    concurrency = random.randint(1,50) if not exploit else random.randint(20,150)
+                    concurrency = random.randint(1,50) if not run_exploit else random.randint(20,150)
                     await asyncio.gather(*tasks, return_exceptions=True)
             else:
                 while True:
@@ -56,8 +56,11 @@ class BaseSimulation(ABC):
                         tasks.append(task)
                     elapsed = int(time() - start_time)
                     print(f"\rActive: {len(tasks)} | Elapsed: {elapsed}s ")
-                    concurrency = random.randint(1,50) if not exploit else random.randint(20,150)
+                    concurrency = random.randint(1,50) if not run_exploit else random.randint(20,150)
                     await asyncio.gather(*tasks, return_exceptions=True)
+
+    def set_run_exploit(self, run_exploit: bool):
+        self.run_exploit = run_exploit
 
     @abstractmethod 
     async def worker(self, session):
@@ -74,6 +77,3 @@ class BaseSimulation(ABC):
     @abstractmethod
     def cleanup(self):
         pass
-
-    def is_exploit(self, exploit=True) -> None:
-        self.exploit = exploit

@@ -29,7 +29,7 @@ def add_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry, i
     key = ebpf_map.Key(ns_id)
     value = ebpf_map.Leaf(0)
     ebpf_map[key] = value
-    print('[+] Container created')
+    print(f'[+] Container created with image: {image} and ID: {container_id}')
 
 def remove_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry, container_id: str):
     ns_id = containers_registry.remove_container(container_id)
@@ -38,7 +38,7 @@ def remove_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry
 
     key = ebpf_map.Key(ns_id)
     del ebpf_map[key]
-    print('[+] Container removed')
+    print(f'[+] Container removed with ID: {container_id}')
 
 def containers_manager(ebpf_map, containers_registry: BpfTrackedContainersRegistry):
     for event in client.events(decode=True):

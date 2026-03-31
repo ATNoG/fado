@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Usage: sudo ./generate [NUM] [NAME] [ARRAY of W]
-# Example: sudo ./generate 8 test 2 3 4
+# Usage: sudo ./validate [NUM] [NAME] [ARRAY of W]
+# Example: sudo ./validate 8 test 2 3 4
 
 set -e
 
 if [ "$#" -lt 1 ]; then
-    echo "Usage: sudo ./generate [NUM] [NAME] [ARRAY of W]"
-    echo "Example: sudo ./generate 8 test 2 3 4"
+    echo "Usage: sudo ./validate [NUM] [NAME] [ARRAY of W]"
+    echo "Example: sudo ./validate 8 test 2 3 4"
     exit 1
 fi
 

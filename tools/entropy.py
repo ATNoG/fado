@@ -56,5 +56,5 @@ plt.tight_layout()
 plt.margins(0)  # remove margins around data
 
 # Save and/or show
-out_png =  "entropy_by_scenario.png"
+out_png = "entropy_by_scenario.png"
 plt.savefig(out_png, dpi=200,bbox_inches='tight', pad_inches=0)

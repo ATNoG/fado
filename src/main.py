@@ -7,14 +7,14 @@ from config import MNTNSMAP
 def main():
     parser = ArgumentParser(description='Trace container syscalls', formatter_class=RawDescriptionHelpFormatter)
 
-    # parser.add_argument("-sc", "--scenario",
-    #     help="""Scenario to use:
-    #         0 → yaml_load
-    #         1 → sentiment_analyzer
-    #         2 → log4jpwn
-    #     """,
-    #     type=int
-    # )
+    parser.add_argument('-sc', '--scenario',
+        help='''Scenario to use:
+            0 -> yaml_load,
+            1 -> sentiment_analyzer,
+            2 -> log4shell
+        ''',
+        type=int
+    )
 
     # parser.add_argument("-w", "--window_size",
     #     help="Sliding window size for syscall context (default: 3).",
@@ -90,6 +90,9 @@ def main():
     # )
 
     args = parser.parse_args()
+    if args.scenario != None:
+        pass
+
     # if args.scenario != None:
     #     from src.simulation import simulate
     #     simulate(
