@@ -5,8 +5,10 @@ from queue import Queue
 from time import sleep
 from config import DB
 
+# TODO: add a type for the 'event'
+
 # TODO: might have to change the way it gets the data from the queue
-def acquire_data(scenario: BaseSimulation, queue: Queue, filename: str, stop_sim, run_exploit: bool, window_size: int, limit: int):
+def acquire_data(scenario: BaseSimulation, queue: Queue, filename: str, run_exploit: bool, window_size: int, limit: int, stop_sim):
     output = open(filename, 'w')
     counter = 0
     data = []
@@ -75,20 +77,19 @@ def acquire_data(scenario: BaseSimulation, queue: Queue, filename: str, stop_sim
 
         sleep(0.5)
 
-def simulate(sc_id: int, limit: int, duration: int, run_exploit: bool, mntnsmap: str, window_size: int, filename: str):
+def simulate(sc_id: int, queue: Queue, limit: int, duration: int, run_exploit: bool, window_size: int, filename: str):
     scenario = ScenarioManager().get_scenario(Scenario(sc_id))
     scenario.set_run_exploit(run_exploit)
 
     # print header
     print('*' * 116)
-    print(f'Simulating {scenario.name}, with {'' if run_exploit else 'no '}exploit {f'for {duration} seconds ' if duration else ''}{f'until {limit} syscalls' if limit else ''}')
+    print(f'Simulating {scenario.name()}, with {'' if run_exploit else 'no '}exploit {f'for {duration} seconds ' if duration else ''}{f'until {limit} syscalls' if limit else ''}')
     print('*' * 116)
 
     # TODO: use a process or a thread??
-    # TODO: fix the arguments to the process
     stop_sim = Event()
-    data_path = str(DB / (filename if filename else f'{scenario.syscallDir}_w{window_size}.csv'))
-    probe = Process(target=acquire_data, args=(scenario, data_path, stop_sim, run_exploit, mntnsmap, window_size, limit))
+    data_path = str(DB / (filename if filename else f'{scenario.syscall_dir}_w{window_size}.csv'))
+    probe = Process(target=acquire_data, args=(scenario, queue, data_path, run_exploit, window_size, limit, stop_sim))
     probe.start()
 
     scenario.simulate(duration, stop_sim, run_exploit)

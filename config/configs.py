@@ -1,5 +1,7 @@
 from pathlib import Path
 
+#### GENERAL CONFIGS ####
+
 POLICY_CONTROLLER = 'http://localhost:8000'
 
 TOLERANCE = 0.6

@@ -3,9 +3,19 @@ from .base_simulation import BaseSimulation
 from enum import Enum
 
 class Scenario(Enum):
-    YAML_LOAD = 0
+    YAML_LOAD        = 0
     SENTIMENTANALYER = 1
-    LOG4SHELL = 2
+    LOG4SHELL        = 2
+
+    @property
+    def image_name(self):
+        mappings = {
+            Scenario.YAML_LOAD: 'yaml_load',
+            Scenario.SENTIMENTANALYER: 'sentiment_analyzer',
+            Scenario.LOG4SHELL: 'log4shell'
+        }
+
+        return mappings[self]
 
 class ScenarioManager:
     def __init__(self):

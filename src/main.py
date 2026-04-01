@@ -1,6 +1,6 @@
+from models import BpfProbe, BpfTrackedContainersRegistry, Scenario
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from .trace_docker import recreate_ebpf_map, containers_manager
-from models import BpfProbe, BpfTrackedContainersRegistry
 from config import MNTNSMAP
 
 # TODO: maybe this should use the local docker tracing instead or Knative for simplicity?
@@ -91,7 +91,11 @@ def main():
 
     args = parser.parse_args()
     if args.scenario != None:
-        pass
+        ebpf_map = recreate_ebpf_map(args.mntnsmap)
+        containers_registry = BpfTrackedContainersRegistry()
+        BpfProbe(containers_registry, args.mntnsmap)
+        containers_manager(ebpf_map, containers_registry, track_scenario=Scenario(args.scenario))
+        return
 
     # if args.scenario != None:
     #     from src.simulation import simulate

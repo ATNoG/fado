@@ -1,4 +1,4 @@
-from models import BpfTrackedContainer, BpfProbe, BpfTrackedContainersRegistry
+from models import BpfTrackedContainer, BpfProbe, BpfTrackedContainersRegistry, Scenario
 from config import MODELS, IMAGE_MODEL_MAPPINGS, MNTNSMAP
 from probe.bcc import BPF
 from queue import Queue
@@ -40,18 +40,30 @@ def remove_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry
     del ebpf_map[key]
     print(f'[+] Container removed with ID: {container_id}')
 
-def containers_manager(ebpf_map, containers_registry: BpfTrackedContainersRegistry):
-    for event in client.events(decode=True):
-        if event['Type'] == 'container':
-            container_action = event['Action']
-            container_image = event['Actor']['Attributes']['image']
-            container_id = event['Actor']['ID']
+def containers_manager(ebpf_map, containers_registry: BpfTrackedContainersRegistry, track_scenario: Scenario | None = None):
+    if track_scenario:
+        print(f'[+] Waiting for a container with image {track_scenario.image_name} to start')
 
-            if container_action == 'start' and f'{container_image}:v1' in IMAGE_MODEL_MAPPINGS:
+    for event in client.events(decode=True):
+        if event['Type'] != 'container':
+            continue
+
+        container_action = event['Action']
+        container_image = event['Actor']['Attributes']['image']
+        container_id = event['Actor']['ID']
+
+        if container_action == 'start':
+            if not track_scenario and f'{container_image}:v1' in IMAGE_MODEL_MAPPINGS:
                 add_container(ebpf_map, containers_registry, container_image, container_id, 'docker_pod', 'docker_node')
 
-            elif container_action in ('die', 'stop', 'kill'):
-                remove_container(ebpf_map, containers_registry, container_id)
+            elif track_scenario and container_image == track_scenario.image_name:
+                add_container(ebpf_map, containers_registry, container_image, container_id, 'docker_pod', 'docker_node')
+                break
+
+        elif container_action in ('die', 'stop', 'kill') and not track_scenario:
+            remove_container(ebpf_map, containers_registry, container_id)
+
+    print('test')
 
 if __name__ == '__main__':
     ebpf_map = recreate_ebpf_map(MNTNSMAP)

