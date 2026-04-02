@@ -1,10 +1,10 @@
 from models import BpfTrackedContainer, BpfProbe, BpfTrackedContainersRegistry
 from config import MODELS, IMAGE_MODEL_MAPPINGS, MNTNSMAP
+from multiprocessing import Queue, set_start_method
 from kubernetes import config as K8sconfig
 from kubernetes.client import CoreV1Api
 import socket, os, subprocess, json
 from kubernetes.watch import Watch
-from queue import Queue
 from probe import BPF
 
 def recreate_ebpf_map(mntnsmap: str):
@@ -41,6 +41,7 @@ def remove_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry
     print(f'[+] Container removed with ID: {container_id}')
 
 def containers_manager(ebpf_map, containers_registry: BpfTrackedContainersRegistry):
+    set_start_method('spawn')
     node_name = socket.gethostname()
     K8sconfig.load_kube_config(config_file='/etc/kubernetes/kubelet.conf')
     node_selector = f'spec.nodeName={node_name}'

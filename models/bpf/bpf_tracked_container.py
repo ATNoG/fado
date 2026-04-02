@@ -1,43 +1,46 @@
 from ..security_alert import SecurityAlert, AlertSeverity, SecurityMeasure
+from multiprocessing import Process, Event, Queue
 from config import TOLERANCE, POLICY_CONTROLLER
 from numpy import isneginf, array as np_array
 from collections import defaultdict, deque
-from threading import Thread, Event
 import requests, subprocess
 from pathlib import Path
 from pickle import load
-from queue import Queue
 
 class BpfTrackedContainer:
     """Represents a container being tracked by eBPF"""
 
-    def __init__(self, image: str, container_id: str, model_path: Path, pod_name: str, node_name: str, queue: Queue[tuple[int, int]], apply_policies=True):
+    def __init__(self, image: str, container_id: str, model_path: Path, pod_name: str, node_name: str, queue: Queue[tuple[int, int]], run_process: bool=True, apply_policies=True):
         self.image = image
         self.container_id = container_id
         self.pod_name = pod_name
         self.node_name = node_name
         self.queue = queue
-        self.apply_policies = apply_policies
-        self.thread_event = Event()
-        self.thread = Thread(target=self.get_windows, daemon=True)
-        self.thread.start()
+        self.run_process = run_process
 
-        # load the model
-        with open(model_path, 'rb') as f:
-            saved_data = load(f)
-            self.model = saved_data['model']
-            self.threshold = saved_data['threshold']
-            self.window_size = saved_data['window_size']
-            self.whitelist = saved_data['whitelist']
+        if self.run_process:
+            # load the model
+            with open(model_path, 'rb') as f:
+                saved_data = load(f)
+                self.model = saved_data['model']
+                self.threshold = saved_data['threshold']
+                self.window_size = saved_data['window_size']
+                self.whitelist = saved_data['whitelist']
+
+            self.apply_policies = apply_policies
+            self.process_event = Event()
+            self.process = Process(target=self.get_windows, daemon=True)
+            self.process.start()
 
     def stop(self):
-        self.thread_event.set()
-        self.thread.join()
+        if self.run_process:
+            self.process_event.set()
+            self.process.join()
 
     def get_windows(self):
         windows = defaultdict(list[int])
         results = deque([0] * 10, maxlen=10)
-        while not self.thread_event.is_set():
+        while not self.process_event.is_set():
             try:
                 tid, sid = self.queue.get(block=True, timeout=0.1)
             except:
@@ -71,7 +74,7 @@ class BpfTrackedContainer:
         return (1 if score < self.threshold or isneginf(score) else 0)
 
     def apply_policy(self) -> bool:
-        # TODO: what to do with the thread after applying the policy??
+        # TODO: what to do with the process after applying the policy??
         try:
             security_alert = SecurityAlert(node_name=self.node_name, pod_name=self.pod_name, container_id=self.container_id, severity=AlertSeverity.High)
             response = requests.post(f'{POLICY_CONTROLLER}/api/alerts', json=security_alert.model_dump(mode='json'), timeout=2)

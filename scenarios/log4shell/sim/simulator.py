@@ -1,6 +1,7 @@
 import scenarios.log4shell.sim.build_servers as bs
 from models.base_simulation import BaseSimulation
-import asyncio, random, requests, threading
+import asyncio, random, requests
+from threading import Thread
 
 class LOG4SHELL(BaseSimulation):
     def __init__(self):
@@ -16,7 +17,7 @@ class LOG4SHELL(BaseSimulation):
         ]
 
         print('Starting Redirect Server')
-        threading.Thread(target=bs.start_http_server, daemon=True).start()
+        Thread(target=bs.start_http_server, daemon=True).start()
         print('Starting LDAP Server')
         self.ldap_proc = bs.start_ldap_server()
 

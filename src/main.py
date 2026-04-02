@@ -1,6 +1,7 @@
+from argparse import ArgumentParser, RawDescriptionHelpFormatter, BooleanOptionalAction
 from models import BpfProbe, BpfTrackedContainersRegistry, Scenario
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from .trace_docker import recreate_ebpf_map, containers_manager
+from .simulation import simulate
 from config import MNTNSMAP
 
 # TODO: maybe this should use the local docker tracing instead or Knative for simplicity?
@@ -16,28 +17,28 @@ def main():
         type=int
     )
 
-    # parser.add_argument("-w", "--window_size",
-    #     help="Sliding window size for syscall context (default: 3).",
-    #     default=3,
-    #     type=int
-    # )
+    parser.add_argument('-w', '--window_size',
+        help='Sliding window size for syscall context (default: 3).',
+        default=3,
+        type=int
+    )
 
-    # parser.add_argument("-l", "--limit",
-    #     help="Maximum number of syscalls to trace before stopping (0 = no limit).",
-    #     default=0,
-    #     type=int
-    # )
+    parser.add_argument('-l', '--limit',
+        help='Maximum number of syscalls to trace before stopping (0 = no limit).',
+        default=0,
+        type=int
+    )
 
-    # parser.add_argument("-e", "--exploit",
-    #     help="Trigger exploit during simulation (default: disabled).",
-    #     default=False,
-    #     action=BooleanOptionalAction
-    # )
+    parser.add_argument('-e', '--exploit',
+        help='Trigger exploit during simulation (default: disabled).',
+        action=BooleanOptionalAction,
+        default=False
+    )
 
     parser.add_argument('--mntnsmap',
+        help=f'BPF map path for mount namespaces (default: {MNTNSMAP}).',
         default=MNTNSMAP,
-        type=str,
-        help=f'BPF map path for mount namespaces (default: {MNTNSMAP}).'
+        type=str
     )
 
     # parser.add_argument('-m', '--model',
@@ -45,11 +46,11 @@ def main():
     #     type=str
     # )
 
-    # parser.add_argument("-d", "--duration",
-    #     help="Simulation duration in seconds (0 = run until stopped).",
-    #     type=int,
-    #     default=0
-    # )
+    parser.add_argument('-d', '--duration',
+        help='Simulation duration in seconds (0 = run until stopped).',
+        type=int,
+        default=0
+    )
 
     # parser.add_argument("--states",
     #     help="Number of hidden states for the HMM (default: 50).",
@@ -79,10 +80,10 @@ def main():
     #     type=str
     # )
 
-    # parser.add_argument("-fn", "--filename",
-    #     help="Custom filename for simulation outputs.",
-    #     type=str
-    # )
+    parser.add_argument('-fn', '--filename',
+        help='Custom filename for simulation outputs.',
+        type=str
+    )
 
     # parser.add_argument("-b", "--baseline",
     #     help="Path to baseline dataset.",
@@ -91,10 +92,15 @@ def main():
 
     args = parser.parse_args()
     if args.scenario != None:
+        if args.filename == None:
+            print("Please specify a filename.")
+            return
+
         ebpf_map = recreate_ebpf_map(args.mntnsmap)
         containers_registry = BpfTrackedContainersRegistry()
         BpfProbe(containers_registry, args.mntnsmap)
-        containers_manager(ebpf_map, containers_registry, track_scenario=Scenario(args.scenario))
+        queue = containers_manager(ebpf_map, containers_registry, track_scenario=Scenario(args.scenario))
+        simulate(args.scenario, queue, args.limit, args.duration, args.exploit, args.window_size, args.filename)
         return
 
     # if args.scenario != None:

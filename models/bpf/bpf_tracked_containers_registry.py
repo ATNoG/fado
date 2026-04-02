@@ -1,6 +1,6 @@
 from .bpf_tracked_container import BpfTrackedContainer
+from multiprocessing import Queue
 from threading import Lock
-from queue import Queue
 
 class BpfTrackedContainersRegistry:
     def __init__(self):
@@ -40,7 +40,7 @@ class BpfTrackedContainersRegistry:
         return namespace_id
 
     def get_container_queue(self, namespace_id: int) -> Queue[tuple[int, int]] | None:
-        """"Get the Queue for the container with the specific namespace id.  
+        """Get the Queue for the container with the specific namespace id.  
         Does nothing if the namespace id does not exist."""
 
         with self.lock:
@@ -50,7 +50,9 @@ class BpfTrackedContainersRegistry:
         return None
 
     def get_pod_container_id(self, pod_name) -> str | None:
-        """Get the container id running in a specific pod if it exists."""
+        """Get the container id running in a specific pod if it exists.  
+        Gets the first one if multiple containers exist per pod.
+        """
         with self.lock:
             for c in self.containers.values():
                 if c.pod_name == pod_name:

@@ -5,7 +5,7 @@ struct syscall_data{
     u64 mnt_ns_id;
 };
 
-BPF_RINGBUF_OUTPUT(events, 1); // 4KB ring buffer
+BPF_RINGBUF_OUTPUT(events, 1 << 12); // 16MB ring buffer
 
 TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
     if (container_should_be_filtered()) {

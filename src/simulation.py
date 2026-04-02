@@ -1,14 +1,13 @@
 from models import BaseSimulation, Scenario, ScenarioManager
-from multiprocessing import Process, Event
+from multiprocessing import Process, Event, Queue
 from random import random
-from queue import Queue
 from time import sleep
 from config import DB
 
 # TODO: add a type for the 'event'
 
 # TODO: might have to change the way it gets the data from the queue
-def acquire_data(scenario: BaseSimulation, queue: Queue, filename: str, run_exploit: bool, window_size: int, limit: int, stop_sim):
+def acquire_data(scenario: BaseSimulation, queue: Queue[tuple[int, int]], filename: str, run_exploit: bool, window_size: int, limit: int, stop_sim):
     output = open(filename, 'w')
     counter = 0
     data = []
@@ -29,9 +28,9 @@ def acquire_data(scenario: BaseSimulation, queue: Queue, filename: str, run_expl
                 print('Triggered the exploit')
                 flag = 1
 
-            data += queue.get(block=True, timeout=1)
+            data += queue.get(block=True)
             for sequence in data:
-                output.write(f"{','.join(map(str, sequence))},{flag}\n")
+                output.write(f'{','.join(map(str, sequence))},{flag}\n')
             counter += len(data) * window_size
 
             if limit > 0:
@@ -77,7 +76,7 @@ def acquire_data(scenario: BaseSimulation, queue: Queue, filename: str, run_expl
 
         sleep(0.5)
 
-def simulate(sc_id: int, queue: Queue, limit: int, duration: int, run_exploit: bool, window_size: int, filename: str):
+def simulate(sc_id: int, queue: Queue[tuple[int, int]], limit: int, duration: int, run_exploit: bool, window_size: int, filename: str):
     scenario = ScenarioManager().get_scenario(Scenario(sc_id))
     scenario.set_run_exploit(run_exploit)
 

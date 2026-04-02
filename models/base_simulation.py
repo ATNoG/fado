@@ -15,10 +15,10 @@ class BaseSimulation(ABC):
     def simulate(self, duration: int, stop_sim, run_exploit: bool):
         asyncio.run(self.trigger_api(duration, stop_sim, run_exploit))
 
-    async def trigger_api(self, sim_time, stop_sim, run_exploit: bool):
+    async def trigger_api(self, duration: int, stop_sim, run_exploit: bool):
         stop_time = None
-        if sim_time:
-            stop_time = time() + sim_time
+        if duration:
+            stop_time = time() + duration
 
         connector = aiohttp.TCPConnector(limit=0, force_close=True)
         concurrency = random.randint(1, 50) if not run_exploit else random.randint(20, 150)
