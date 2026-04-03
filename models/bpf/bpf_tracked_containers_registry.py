@@ -39,13 +39,23 @@ class BpfTrackedContainersRegistry:
 
         return namespace_id
 
-    def get_container_queue(self, namespace_id: int) -> Queue[tuple[int, int]] | None:
+    def get_container_queue(self, namespace_id: int) -> Queue[list[list[int]]] | None:
         """Get the Queue for the container with the specific namespace id.  
         Does nothing if the namespace id does not exist."""
 
         with self.lock:
             if namespace_id in self.containers:
                 return self.containers[namespace_id].queue
+
+        return None
+
+    def get_container_window_size(self, namespace_id: int) -> int | None:
+        """Get the window size for the container with the specific namespace id.  
+        Does nothing if the namespace id does not exist."""
+
+        with self.lock:
+            if namespace_id in self.containers:
+                return self.containers[namespace_id].window_size
 
         return None
 

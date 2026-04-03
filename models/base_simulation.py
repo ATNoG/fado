@@ -17,7 +17,7 @@ class BaseSimulation(ABC):
 
     async def trigger_api(self, duration: int, stop_sim, run_exploit: bool):
         stop_time = None
-        if duration:
+        if duration > 0:
             stop_time = time() + duration
 
         connector = aiohttp.TCPConnector(limit=0, force_close=True)

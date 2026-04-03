@@ -1,5 +1,6 @@
 from .bpf_tracked_containers_registry import BpfTrackedContainersRegistry
 from probe import BPF, filter_by_containers
+from collections import defaultdict
 from dataclasses import dataclass
 from threading import Thread
 
@@ -21,14 +22,25 @@ class BpfProbe:
         self.thread.start()
 
     def monitor(self):
+        tmp_windows = defaultdict(list)
+
         def handle_event(cpu, data, size):
             event = self.bpf['events'].event(data)
+            tmp_windows[event.tid].append(event.sid)
+
             queue = self.container_registry.get_container_queue(event.mnt_ns_id)
-            if queue != None:
+            window_size = self.container_registry.get_container_window_size(event.mnt_ns_id)
+            if not queue or not window_size:
+                return
+
+            if len(tmp_windows[event.tid]) > window_size:
+                tmp_windows[event.tid].pop(0)
+
+            if len(tmp_windows[event.tid]) == window_size:
                 try:
-                    # TODO: does it make sense to use a timeout here??
-                    # we cannot hold the probe back if some consumer thread decides to hang or is just too slow
-                    queue.put((event.tid, event.sid), block=False, timeout=None)
+                    # TODO: should this have a timeout just to avoid unnecessary data losses?
+                    # we cannot hold the probe back if some consumer thread/process decides to hang or is just too slow
+                    queue.put([tmp_windows[event.tid][:]], block=False, timeout=None)
                 except:
                     pass
 

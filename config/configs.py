@@ -1,5 +1,7 @@
 from pathlib import Path
 
+# TODO: maybe add the max queue size here??
+
 #### GENERAL CONFIGS ####
 
 POLICY_CONTROLLER = 'http://localhost:8000'

@@ -6,8 +6,7 @@ from config import DB
 
 # TODO: add a type for the 'event'
 
-# TODO: might have to change the way it gets the data from the queue
-def acquire_data(scenario: BaseSimulation, queue: Queue[tuple[int, int]], filename: str, run_exploit: bool, window_size: int, limit: int, stop_sim):
+def acquire_data(scenario: BaseSimulation, queue: Queue[list[list[int]]], filename: str, run_exploit: bool, window_size: int, limit: int, stop_sim):
     output = open(filename, 'w')
     counter = 0
     data = []
@@ -17,7 +16,7 @@ def acquire_data(scenario: BaseSimulation, queue: Queue[tuple[int, int]], filena
 
     while True:
         flag = 0
-        if stop_sim.is_set() or counter >= limit:
+        if stop_sim.is_set() or (limit > 0 and counter >= limit):
             # make sure to set the event
             if not stop_sim.is_set():
                 stop_sim.set()
@@ -28,7 +27,8 @@ def acquire_data(scenario: BaseSimulation, queue: Queue[tuple[int, int]], filena
                 print('Triggered the exploit')
                 flag = 1
 
-            data += queue.get(block=True)
+            # TODO: is the timeout a good idea?
+            data += queue.get(block=True, timeout=1)
             for sequence in data:
                 output.write(f'{','.join(map(str, sequence))},{flag}\n')
             counter += len(data) * window_size
@@ -76,7 +76,7 @@ def acquire_data(scenario: BaseSimulation, queue: Queue[tuple[int, int]], filena
 
         sleep(0.5)
 
-def simulate(sc_id: int, queue: Queue[tuple[int, int]], limit: int, duration: int, run_exploit: bool, window_size: int, filename: str):
+def simulate(sc_id: int, queue: Queue[list[list[int]]], limit: int, duration: int, run_exploit: bool, window_size: int, filename: str):
     scenario = ScenarioManager().get_scenario(Scenario(sc_id))
     scenario.set_run_exploit(run_exploit)
 
@@ -85,9 +85,8 @@ def simulate(sc_id: int, queue: Queue[tuple[int, int]], limit: int, duration: in
     print(f'Simulating {scenario.name()}, with {'' if run_exploit else 'no '}exploit {f'for {duration} seconds ' if duration else ''}{f'until {limit} syscalls' if limit else ''}')
     print('*' * 116)
 
-    # TODO: use a process or a thread??
     stop_sim = Event()
-    data_path = str(DB / (filename if filename else f'{scenario.syscall_dir}_w{window_size}.csv'))
+    data_path = f'{DB / (filename.removesuffix('.csv') if filename else f'{scenario.syscall_dir}_w{window_size}')}.csv'
     probe = Process(target=acquire_data, args=(scenario, queue, data_path, run_exploit, window_size, limit, stop_sim))
     probe.start()
 

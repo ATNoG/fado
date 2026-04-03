@@ -92,6 +92,7 @@ def main():
 
     args = parser.parse_args()
     if args.scenario != None:
+        # TODO: the filename should not be necessary. fix that
         if args.filename == None:
             print("Please specify a filename.")
             return

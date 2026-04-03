@@ -2,7 +2,7 @@ from ..security_alert import SecurityAlert, AlertSeverity, SecurityMeasure
 from multiprocessing import Process, Event, Queue
 from config import TOLERANCE, POLICY_CONTROLLER
 from numpy import isneginf, array as np_array
-from collections import defaultdict, deque
+from collections import deque
 import requests, subprocess
 from pathlib import Path
 from pickle import load
@@ -10,7 +10,7 @@ from pickle import load
 class BpfTrackedContainer:
     """Represents a container being tracked by eBPF"""
 
-    def __init__(self, image: str, container_id: str, model_path: Path, pod_name: str, node_name: str, queue: Queue[tuple[int, int]], run_process: bool=True, apply_policies=True):
+    def __init__(self, image: str, container_id: str, model_path: Path, pod_name: str, node_name: str, queue: Queue[list[list[int]]], run_process: bool=True, apply_policies=True):
         self.image = image
         self.container_id = container_id
         self.pod_name = pod_name
@@ -18,18 +18,18 @@ class BpfTrackedContainer:
         self.queue = queue
         self.run_process = run_process
 
-        if self.run_process:
-            # load the model
-            with open(model_path, 'rb') as f:
-                saved_data = load(f)
-                self.model = saved_data['model']
-                self.threshold = saved_data['threshold']
-                self.window_size = saved_data['window_size']
-                self.whitelist = saved_data['whitelist']
+        # load the model
+        with open(model_path, 'rb') as f:
+            saved_data = load(f)
+            self.model = saved_data['model']
+            self.threshold = saved_data['threshold']
+            self.window_size = saved_data['window_size']
+            self.whitelist = saved_data['whitelist']
 
+        if self.run_process:
             self.apply_policies = apply_policies
             self.process_event = Event()
-            self.process = Process(target=self.get_windows, daemon=True)
+            self.process = Process(target=self.run, daemon=True)
             self.process.start()
 
     def stop(self):
@@ -37,41 +37,35 @@ class BpfTrackedContainer:
             self.process_event.set()
             self.process.join()
 
-    def get_windows(self):
-        windows = defaultdict(list[int])
+    def run(self):
         results = deque([0] * 10, maxlen=10)
+        windows = []
+
         while not self.process_event.is_set():
             try:
-                tid, sid = self.queue.get(block=True, timeout=0.1)
+                windows += self.queue.get(block=True, timeout=0.1)
             except:
                 continue
 
-            windows[tid].append(sid)
-            if len(windows[tid]) > self.window_size:
-                windows[tid].pop(0)
+            while not self.queue.empty():
+                windows += self.queue.get_nowait()
+            windows.sort(key=lambda e: e[0])
 
-            if len(windows[tid]) == self.window_size:
-                results.append(self.run_model(windows[tid]))
+            for window in windows:
+                if tuple(window) in self.whitelist:
+                    results.append(0)
+                    continue
+                else:
+                    seq = np_array(window).reshape(-1, 1)
+                    score = self.model.score(seq, [len(window)])
+                    results.append(1 if score < self.threshold or isneginf(score) else 0)
 
                 if sum(results) > len(results) * TOLERANCE:
                     print('[-] Anomaly detected')
                     if self.apply_policies and self.apply_policy():
                         return
 
-    def run_model(self, window: list[int]) -> int:
-        # data = []
-        # while True:
-            # data += queue.get()
-            # while not queue.empty():
-            #     data += queue.get_nowait()
-            # data.sort(key=lambda e: e[0]) # TODO: why the sort??
-
-        if tuple(window) in self.whitelist:
-            return 0
-
-        seq = np_array(window).reshape(-1,1)
-        score = self.model.score(seq, [len(window)])
-        return (1 if score < self.threshold or isneginf(score) else 0)
+            windows.clear()
 
     def apply_policy(self) -> bool:
         # TODO: what to do with the process after applying the policy??

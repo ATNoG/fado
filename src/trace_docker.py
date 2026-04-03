@@ -41,7 +41,7 @@ def remove_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry
     del ebpf_map[key]
     print(f'[+] Container removed with ID: {container_id}')
 
-def containers_manager(ebpf_map, containers_registry: BpfTrackedContainersRegistry, track_scenario: Scenario | None = None) -> Queue[tuple[int, int]]:
+def containers_manager(ebpf_map, containers_registry: BpfTrackedContainersRegistry, track_scenario: Scenario | None = None) -> Queue[list[list[int]]]:
     set_start_method('spawn')
     if track_scenario:
         print(f'[+] Waiting for a container with image {track_scenario.image_name} to start')
