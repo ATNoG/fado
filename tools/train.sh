@@ -1,38 +1,34 @@
 #!/usr/bin/env bash
-# Usage: sudo ./train [NUM] [NAME]
-# Example: sudo ./train 8 test
+# Usage: sudo ./train
+# Example: sudo ./train
 
 set -e
 
 if [ "$#" -ne 0 ]; then
-    echo "Usage: sudo ./train [NAME]"
-    echo "Example: sudo ./train test"
+    echo "Usage: sudo ./train"
+    echo "Example: sudo ./train"
     exit 1
 fi
 
-# NAME=$1
-NAMES=("Log4Shell" "SentimentAnalyzer") 
+NAMES=("Log4Shell" "SentimentAnalyzer" "YamlLoad")
 MAX_JOBS=7
 
-# --- Hard-coded parameter sets ---
-W_LIST=(3 2 4 6 8 10)
+# hard-coded parameter sets
+W_LIST=(2 3 4 6 8 10)
 STATES_LIST=(10 50 30 5)
 
 echo "=== Starting model evaluation in parallel ${MAX_JOBS} ==="
 
+mkdir -p eval
 for NAME in "${NAMES[@]}"; do
     for W in "${W_LIST[@]}"; do
         for STATES in "${STATES_LIST[@]}"; do
             MODEL_NAME="${NAME}_${STATES}s_w${W}_10p"
             echo "Launching evaluation for ${MODEL_NAME}"
-            sudo venv/bin/python3 -m src.main \
-                -m "$MODEL_NAME" \
-                --states "$STATES" \
-                -t "${NAME}_${W}" \
-                --test "${NAME}_${W}_test_v2" \
+            sudo venv/bin/python3 -m src.main -fn "$MODEL_NAME" --states "$STATES" -t "${NAME}_${W}_baseline" --test "${NAME}_${W}_test"
                 > "eval/eval_${MODEL_NAME}.log" 2>&1 &
 
-            # Limit concurrency: if we have $MAX_JOBS running, wait for one to finish
+            # limit concurrency: if we have $MAX_JOBS running, wait for one to finish
             while (( $(jobs -r | wc -l) >= MAX_JOBS )); do
                 sleep 25
             done
@@ -40,6 +36,7 @@ for NAME in "${NAMES[@]}"; do
     done
 done
 
-# Wait for all background jobs to finish
+# wait for all background jobs to finish
 wait
+
 echo "=== All evaluations completed successfully ==="

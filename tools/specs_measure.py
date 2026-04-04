@@ -29,7 +29,7 @@ while monotonic() < end_time:
         mem_use.append(memory_use)
         counter += 1
     except KeyboardInterrupt:
-        print("Interrupted by user.")
+        print('Interrupted by user.')
         break
 
 def sem(values):
@@ -43,25 +43,25 @@ err_mem_use = sem(mem_use)
 
 avg_cpu_time = cpu_time / counter
 
-with open("tools/performance.txt", "a") as f:
-    f.write(f"\n\n\n{name}\n")
+with open('tools/performance.txt', 'a') as f:
+    f.write(f'\n\n\n{name}\n')
 
-    f.write("=== CPU ===\n")
-    f.write(f"Average CPU %%: {avg_cpu_perc:.2f} ± {err_cpu_perc:.2f}\n")
-    f.write(f"Avg CPU time per second: {avg_cpu_time:.4f} s/s\n\n")
+    f.write('=== CPU ===\n')
+    f.write(f'Average CPU %%: {avg_cpu_perc:.2f} ± {err_cpu_perc:.2f}\n')
+    f.write(f'Avg CPU time per second: {avg_cpu_time:.4f} s/s\n\n')
 
-    f.write("=== Memory ===\n")
-    f.write(f"Average RSS: {avg_mem_use / (1024*1024):.2f} MiB ± {err_mem_use / (1024*1024):.2f}\n")
+    f.write('=== Memory ===\n')
+    f.write(f'Average RSS: {avg_mem_use / (1024*1024):.2f} MiB ± {err_mem_use / (1024*1024):.2f}\n')
 
-print(f"Summary written")
+print(f'Summary written')
 
-print(f"\n{name}\n")
+print(f'\n{name}\n')
 
-print("=== CPU ===\n")
-print(f"Average CPU %%: {avg_cpu_perc:.2f} ± {err_cpu_perc:.2f}\n")
-print(f"Avg CPU time per second: {avg_cpu_time:.4f} s/s\n\n")
+print('=== CPU ===\n')
+print(f'Average CPU %%: {avg_cpu_perc:.2f} ± {err_cpu_perc:.2f}\n')
+print(f'Avg CPU time per second: {avg_cpu_time:.4f} s/s\n\n')
 
-print("=== Memory ===\n")
-print(f"Average RSS: {avg_mem_use / (1024*1024):.2f} MiB ± {err_mem_use / (1024*1024):.2f}\n")
+print('=== Memory ===\n')
+print(f'Average RSS: {avg_mem_use / (1024*1024):.2f} MiB ± {err_mem_use / (1024*1024):.2f}\n')
 
-print(f"Iterations: {counter}")
+print(f'Iterations: {counter}')

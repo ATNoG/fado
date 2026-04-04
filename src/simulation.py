@@ -4,8 +4,6 @@ from random import random
 from time import sleep
 from config import DB
 
-# TODO: add a type for the 'event'
-
 def acquire_data(scenario: BaseSimulation, queue: Queue[list[list[int]]], filename: str, run_exploit: bool, window_size: int, limit: int, stop_sim):
     output = open(filename, 'w')
     counter = 0
@@ -27,8 +25,7 @@ def acquire_data(scenario: BaseSimulation, queue: Queue[list[list[int]]], filena
                 print('Triggered the exploit')
                 flag = 1
 
-            # TODO: is the timeout a good idea?
-            data += queue.get(block=True, timeout=1)
+            data += queue.get(block=True)
             for sequence in data:
                 output.write(f'{','.join(map(str, sequence))},{flag}\n')
             counter += len(data) * window_size
@@ -76,7 +73,7 @@ def acquire_data(scenario: BaseSimulation, queue: Queue[list[list[int]]], filena
 
         sleep(0.5)
 
-def simulate(sc_id: int, queue: Queue[list[list[int]]], limit: int, duration: int, run_exploit: bool, window_size: int, filename: str):
+def simulate(sc_id: int, queue: Queue[list[list[int]]], limit: int, duration: int, run_exploit: bool, window_size: int, filename: str | None):
     scenario = ScenarioManager().get_scenario(Scenario(sc_id))
     scenario.set_run_exploit(run_exploit)
 

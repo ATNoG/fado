@@ -21,10 +21,11 @@ class BpfTrackedContainer:
         # load the model
         with open(model_path, 'rb') as f:
             saved_data = load(f)
-            self.model = saved_data['model']
-            self.threshold = saved_data['threshold']
-            self.window_size = saved_data['window_size']
-            self.whitelist = saved_data['whitelist']
+
+        self.model = saved_data['model']
+        self.threshold = saved_data['threshold']
+        self.window_size = saved_data['window_size']
+        self.whitelist = saved_data['whitelist']
 
         if self.run_process:
             self.apply_policies = apply_policies

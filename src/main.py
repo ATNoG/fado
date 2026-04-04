@@ -1,102 +1,63 @@
 from argparse import ArgumentParser, RawDescriptionHelpFormatter, BooleanOptionalAction
-from models import BpfProbe, BpfTrackedContainersRegistry, Scenario
+from models import BpfProbe, BpfTrackedContainersRegistry, Scenario, HMM
 from .trace_docker import recreate_ebpf_map, containers_manager
 from .simulation import simulate
 from config import MNTNSMAP
 
-# TODO: maybe this should use the local docker tracing instead or Knative for simplicity?
 def main():
     parser = ArgumentParser(description='Trace container syscalls', formatter_class=RawDescriptionHelpFormatter)
 
-    parser.add_argument('-sc', '--scenario',
+    parser.add_argument('-sc', '--scenario', type = int,
         help='''Scenario to use:
             0 -> yaml_load,
             1 -> sentiment_analyzer,
             2 -> log4shell
-        ''',
-        type=int
+        '''
     )
 
-    parser.add_argument('-w', '--window_size',
-        help='Sliding window size for syscall context (default: 3).',
-        default=3,
-        type=int
+    parser.add_argument('-w', '--window_size', type=int, default=3,
+        help='Sliding window size for syscall context (default: 3).'
     )
 
-    parser.add_argument('-l', '--limit',
-        help='Maximum number of syscalls to trace before stopping (0 = no limit).',
-        default=0,
-        type=int
+    parser.add_argument('-l', '--limit', type=int, default=0,
+        help='Maximum number of syscalls to trace before stopping (0 = no limit).'
     )
 
-    parser.add_argument('-e', '--exploit',
-        help='Trigger exploit during simulation (default: disabled).',
-        action=BooleanOptionalAction,
-        default=False
+    parser.add_argument('-e', '--exploit', default=False, action=BooleanOptionalAction,
+        help='Trigger exploit during simulation (default: disabled).'
     )
 
-    parser.add_argument('--mntnsmap',
-        help=f'BPF map path for mount namespaces (default: {MNTNSMAP}).',
-        default=MNTNSMAP,
-        type=str
+    parser.add_argument('--mntnsmap', type=str, default=MNTNSMAP,
+        help=f'BPF map path for mount namespaces (default: {MNTNSMAP}).'
     )
 
-    # parser.add_argument('-m', '--model',
-    #     help='Path to load or save the HMM model.',
-    #     type=str
-    # )
-
-    parser.add_argument('-d', '--duration',
-        help='Simulation duration in seconds (0 = run until stopped).',
-        type=int,
-        default=0
+    parser.add_argument('-d', '--duration', type=int, default=0,
+        help='Simulation duration in seconds (0 = run until stopped).'
     )
 
-    # parser.add_argument("--states",
-    #     help="Number of hidden states for the HMM (default: 50).",
-    #     type=int,
-    #     default=50
-    # )
-
-    # parser.add_argument("--iterations",
-    #     help="Number of training iterations for the HMM (default: 500).",
-    #     type=int,
-    #     default=500
-    # )
-
-    # parser.add_argument("-t", "--train",
-    #     help="Path to training dataset",
-    #     type=str
-    # )
-
-    # parser.add_argument("-v", "--validation",
-    #     help="Path to training dataset",
-    #     type=str,
-    #     default=None
-    # )
-
-    # parser.add_argument( "--test",
-    #     help="Path to testing dataset",
-    #     type=str
-    # )
-
-    parser.add_argument('-fn', '--filename',
-        help='Custom filename for simulation outputs.',
-        type=str
+    parser.add_argument('--states', type=int, default=50,
+        help='Number of hidden states for the HMM (default: 50).'
     )
 
-    # parser.add_argument("-b", "--baseline",
-    #     help="Path to baseline dataset.",
-    #     type=str
-    # )
+    parser.add_argument('--iterations', type=int, default=500,
+        help='Number of training iterations for the HMM (default: 500).'
+    )
+
+    parser.add_argument('-t', '--train', type=str,
+        help='Path to training dataset.'
+    )
+
+    parser.add_argument( '--test', type=str,
+        help='Path to testing dataset.'
+    )
+
+    parser.add_argument('-fn', '--filename', type=str,
+        help='Custom filename for inputs/outputs.'
+    )
 
     args = parser.parse_args()
     if args.scenario != None:
-        # TODO: the filename should not be necessary. fix that
-        if args.filename == None:
-            print("Please specify a filename.")
-            return
-
+        print('Simulating...')
         ebpf_map = recreate_ebpf_map(args.mntnsmap)
         containers_registry = BpfTrackedContainersRegistry()
         BpfProbe(containers_registry, args.mntnsmap)
@@ -104,42 +65,26 @@ def main():
         simulate(args.scenario, queue, args.limit, args.duration, args.exploit, args.window_size, args.filename)
         return
 
-    # if args.scenario != None:
-    #     from src.simulation import simulate
-    #     simulate(
-    #         scenarioID = args.scenario,
-    #         limit = args.limit,
-    #         duration = args.duration,
-    #         exploit = args.exploit,
-    #         mntns = args.mntnsmap,
-    #         window_size = args.window_size,
-    #         baseline = args.baseline,
-    #         filename = args.filename,
-    #     )
-    #     if not (args.train or args.test):
-    #         exit(0)
+    if args.train or args.test:
+        if not args.filename:
+            print('Please provide a filename to save/load the HMM.')
+            return
 
-    # if not args.model:
-    #     print('ERROR: No model given.')
-    #     exit(1)
+        model = HMM(args.filename, n_components=args.states, n_iter=args.iterations)
 
-    # if args.train or args.test:
-    #     from models import HMM
-    #     model = HMM(args.model, n_components=args.states, n_iter=args.iterations)
+    if args.train:
+        print('Training...')
+        model.train(args.train)
+        if not args.test:
+            return
 
-    # if args.train:
-    #     print("Train Triggered")
-    #     model.train(args.train)
-    #     if not args.test:
-    #         exit(0)
-
-    # if args.test:
-    #     print("Test Triggered")
-    #     model.test(args.test)
-    #     exit(0)
+    if args.test:
+        print('Testing...')
+        model.test(args.test)
+        return
 
     # default behavior
-    print("Tracing...")
+    print('Tracing...')
     ebpf_map = recreate_ebpf_map(args.mntnsmap)
     containers_registry = BpfTrackedContainersRegistry()
     BpfProbe(containers_registry, args.mntnsmap)

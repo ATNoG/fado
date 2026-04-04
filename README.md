@@ -1,94 +1,54 @@
-#  Function-level Anomaly Detection Observer (FADO): Detecting Anomalies in Serverless Functions via eBPF System Call Tracing
+# Function-level Anomaly Detection Observer (FADO): Detecting Anomalies in Serverless Functions via eBPF System Call Tracing
 
 FADO is a framework designed to perform fine-grained anomaly detection in serverless functions by modeling the normal behavior of system calls using Hidden Markov Models (HMMs). It enables reliable detection of both known exploits and potential zero-day attacks with minimal false positives, low latency, and a lightweight resource footprint. By leveraging function-specific system call traces and n-gram sequence modeling, FADO provides real-time observability and security in serverless computing environments.
 
 FADO is tested in multiple real-world scenarios provided under the [scenarios](./scenarios/) folder.
 
-## Getting Started 
+## Getting Started
 
 ### Prerequisites
 ```bash
-python -m venv fado_env
-source fado_env/bin/activate
+python -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 >**Follow the BCC install described [here](https://github.com/iovisor/bcc/blob/master/INSTALL.md#ubuntu---source)**
 
+>**For local execution, Docker is required however, it is also possible to run this on a Kubernetes/Knative cluster.**
+
 > ⚠️ **Important:**  
 > To allow eBPF to probe syscall logs, all commands must be executed with sudo using the virtual environment’s Python.
 
-### Filtering Syscalls from Containers
+## Execution Flow (for local usage/training)
 
-To ensure the framework traces **only the system calls executed inside containers**, we use an eBPF hash map (`BPF_HASH`) that stores the mount namespace ID (`mnt_ns`) of the container we want to monitor.  
+Running this locally will trace containers running in Docker.
 
-At runtime, the tracing logic will filter syscalls so that **only the ones matching the stored `mnt_ns` ID are recorded**.  
-
-> ⚠️ **Current Limitation:**  
-> The framework supports **only one container at a time**. Every time you launch a new container, you must manually update the map with the namespace ID of that container and stop or remove the previous one. Otherwise, syscalls from the new container will not be captured.  
-
-### Setup Instructions
-This script can be used to tell FADO the container namespace to trace. It automatically passes the one corresponding to the first container ID it finds, to specify it set the CONTAINERID accordingly.
-
-> ⚠️ **Launch the container to be traced prior to this setup**
-
-> This script is available as `setup.sh`.
-
-```bash
-sudo bpftool map create /sys/fs/bpf/mnt_ns_set type hash key 8 value 4 entries 128 name mnt_ns_set flags 0
-
-FILE=/sys/fs/bpf/mnt_ns_set
-if [ $(printf '\1' | od -dAn) -eq 1 ]; then
-    HOST_ENDIAN_CMD=tac
-else
-    HOST_ENDIAN_CMD=cat
-fi
-
-# ENTER MANUALLY IF MORE THAN ONE CONTAINER ACTIVE
-CONTAINERID="$(docker ps -q | head -n 1)" 
-
-NS_ID_HEX="$(printf '%016x' $(sudo stat -Lc '%i' /proc/$(docker inspect --format '{{.State.Pid}}' $CONTAINERID)/ns/mnt) | sed 's/.\{2\}/&\n/g' | $HOST_ENDIAN_CMD)"
-sudo bpftool map update pinned $FILE key hex $NS_ID_HEX value hex 00 00 00 00 any
-```
-
-To check the entries already in the map
-```bash
-sudo bpftool map dump pinned /sys/fs/bpf/mnt_ns_set
-```
-
-## Execution Flow
-
-1. **Simulation Mode (`--simulation`)**  
+1. **Simulation Mode (`--scenario`/`-sc`)**  
    Runs a scenario-based container simulation. 
-   - Executes exploit if `--exploit` is set.  
-   - Applies sliding-window tracing (`--window_size`).  
-   - Saves output under `--filename` if provided.  
-   - Exits unless `--train` or `--test` are also requested.  
+   - Executes exploit if `--exploit`/`-e` is set.  
+   - Applies sliding-window tracing with size: `--window_size`/`-w`.  
+   - Saves output under `--filename`/`-fn` if provided.  
 
-2. **Model Training (`--train`)**  
-   - Requires `--model` (where to save/load the model).  
-   - Requires train data file `--train`.  
+2. **Model Training (`--train`/`-t`)**  
+   - Requires `--filename`/`-fn` (where to save/load the model).  
+   - Requires train data file `--train`/`-t`.  
    - Builds an HMM with parameters:  
      - Hidden states: `--states`  
      - Iterations: `--iterations`  
-   - Saves the trained model to `--model`.  
 
 3. **Model Testing (`--test`)**  
-   - Requires `--model` and `--test`.  
+   - Requires `--filename`/`-fn` and `--test`.  
    - Loads the HMM from file.  
 
 4. **Live Tracing (default fallback)**  
-   - If no `--simulation`, `--train`, or `--test` is specified:  
    - Attaches to kernel probes to trace syscalls in real-time.  
-   - Performs anomaly detection using `--model`.  
 
-> **Note:** The performance values presented in the associated document were obtained using a specialized venv with only the __hmmlearn__ lib installed. To allow its use, comment the first 2 lines [here](utils/__init__.py)
-
-## Example Commands
+## Example Usage (for local usage/training)
 
 ### Run a Simulation
 ```bash
 sudo venv/bin/python3 -m src.main \
-    -sc 1 \                       # Scenario ID
+    -sc 0 \                       # Scenario ID
     -d 60 \                       # Duration in seconds
     -l 10000 \                    # Stop after 10000 syscalls (0 = unlimited)
     -e \                          # Trigger exploit during simulation
@@ -97,30 +57,48 @@ sudo venv/bin/python3 -m src.main \
 
 ### Train Model
 ```bash
-sudo venv/bin/python3 -m src.main -m hmm \
-    -t train_data \                # Enable training mode
-    --states 100 \                 # Number of hidden states
-    --iterations 200               # Training iterations
+sudo venv/bin/python3 -m src.main \
+    -fn hmm \                     # Save the model as 'hmm'
+    -t train_data \               # Enable training mode
+    --states 100 \                # Number of hidden states
+    --iterations 200              # Training iterations
 ```
 
 ### Test Model
 ```bash
-sudo venv/bin/python3 -m src.main -m hmm \
-    --test test_data \     # Enable test mode
+sudo venv/bin/python3 -m src.main \
+    -fn hmm \                     # Use the 'hmm' model
+    --test test_data \            # Enable test mode
 ```
 
 ### Dynamic Anomaly Detection 
 ```bash
-sudo venv/bin/python3 -m src.main -m hmm
+sudo venv/bin/python3 -m src.main
+```
+
+## Execution Flow (in Kubernetes/Knative cluster)
+
+To run this in Knative (run in each node):
+```bash
+sudo venv/bin/python3 -m src.trace_k8s
+```
+
+Run the policy controller (in a single place):
+```bash
+sudo venv/bin/python3 -m src.policy_controller
 ```
 
 ## Directory Tree
 ```
-├── data/                   # Containing generated files during training and testing
-|   ├── logs/               # Generated data
-|   ├── models/             # Saved models
-|   └── stats/              # Model statistics
+├── config/                 # Contains the runtime configurations for the whole project (almost)
+├── data/                   # Contains generated files during training and testing
+│   ├── logs/               # Data captured for training and testing
+│   ├── models/             # Trained models
+│   └── stats/              # Trained Model statistics
 ├── models/
+│   ├── bpf/
+│   │   ├── 
+│   │   └── 
 │   ├── __init__.py
 │   └── hmm.py              # Classification model (train/test routines)
 ├── probe/
@@ -134,7 +112,7 @@ sudo venv/bin/python3 -m src.main -m hmm
 ├── tools/                  # Additional tools
 ├── src/                       
 │   ├── __init__.py
-|   ├── cleanup_data.py     # Apply the STIDE algorithm 
+│   ├── cleanup_data.py     # Apply the STIDE algorithm 
 │   ├── main.py             # Entry point
 │   ├── simulation.py       # Data Generation
 │   └── trace.py            # Dynamic Anomaly Detection
