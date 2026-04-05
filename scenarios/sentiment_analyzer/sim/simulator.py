@@ -20,15 +20,12 @@ class SENTIMENTANALYZER(BaseSimulation):
             'Content-Type': 'text/plain'
         }
 
-        dataDir = Path.cwd() / 'comments'
+        dataDir = Path.cwd() / 'scenarios' / 'sentiment_analyzer' / 'sim' / 'comments'
         files = [f'{dataDir}/{f}' for f in os.listdir(dataDir) if os.path.isfile(os.path.join(dataDir, f))]
-        try:
-            filePath = random.choice(files)
-            with open(filePath, 'rb') as f:
-                async with session.post(self.url, data=f, headers=headers) as response:
-                    await response.text()
-        except:
-            pass
+        filePath = random.choice(files)
+        with open(filePath, 'rb') as f:
+            async with session.post(self.url, data=f, headers=headers) as response:
+                await response.text()
 
     def call_exploit(self):
         headers = {

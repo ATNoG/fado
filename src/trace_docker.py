@@ -17,7 +17,6 @@ def recreate_ebpf_map(mntnsmap: str):
     return bpf.get_table('mnt_ns_set')
 
 def add_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry, image: str, container_id: str, pod_name: str, node_name: str, run_process: bool=True) -> int | None:
-    # TODO: what if this fails somehow?
     container_pid = client.containers.get(container_id).attrs['State']['Pid']
     ns_id = os.stat(f'/proc/{container_pid}/ns/mnt').st_ino
 

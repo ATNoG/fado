@@ -4,7 +4,7 @@ Example:
 
 ```bash
 docker build -t sentiment_analyzer .
-docker run -d --name spring-container -p 8080:8080 sentiment_analyzer:latest
+docker run -d --name spring-container -p 8080:8080 sentiment_analyzer
 ```
 
 ## Exploit

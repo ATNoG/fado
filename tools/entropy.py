@@ -17,16 +17,16 @@ for scenario in scenarios:
         print(f'Processing {name}...')
         data = pd.read_csv(path, header=None)
 
-        # Drop last column if not needed
+        # drop last column if not needed
         data.drop(data.columns[-1], axis=1, inplace=True)
 
-        # Convert rows to tuples (so they can be counted)
+        # convert rows to tuples (so they can be counted)
         rows = [tuple(row) for row in data.to_numpy()]
         counter = Counter(rows)
         total = len(rows)
         rel_freqs = np.array(list(counter.values())) / total
 
-        # Compute Shannon entropy
+        # compute shannon entropy
         entropy = -np.sum(rel_freqs * np.log2(rel_freqs))
         print(entropy)
         entropies[scenario.split('_')[1]].append(entropy)
@@ -34,13 +34,13 @@ for scenario in scenarios:
 
 entropies['SentimentAnalyzer'] = [4.464393104, 4.5550405, 4.621421, 4.782818, 4.950117, 5.121028]
 
-# Tabulate for quick inspection
+# tabulate for quick inspection
 entropy_table = pd.DataFrame(entropies, index=windows)
 print('\nEntropy by scenario and window:')
 print(entropy_table)
 scenarios.append('d_SentimentAnalyzer')
 
-# Plot
+# plot
 plt.figure(figsize=(14, 8))
 plt.rcParams.update({'font.size': 23})
 
@@ -53,8 +53,8 @@ plt.xticks(windows)
 plt.grid(True, linestyle='--', linewidth=0.5, alpha=0.6)
 plt.legend(title='Scenario')
 plt.tight_layout()
-plt.margins(0)  # remove margins around data
+plt.margins(0) # remove margins around data
 
-# Save and/or show
+# save and/or show
 out_png = 'entropy_by_scenario.png'
 plt.savefig(out_png, dpi=200,bbox_inches='tight', pad_inches=0)

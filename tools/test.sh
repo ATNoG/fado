@@ -21,7 +21,7 @@ for W in "${W_LIST[@]}"; do
     for STATES in "${STATES_LIST[@]}"; do
         MODEL_NAME="${NAME}_${STATES}s_w${W}_3p"
         echo "Launching evaluation for ${MODEL_NAME}"
-        sudo venv/bin/python3 -m src.main -m "$MODEL_NAME" --test "${NAME}_${W}_test"
+        sudo venv/bin/python3 -m src.main -m "$MODEL_NAME" --test "${NAME}_${W}_test" \
             > "eval_${MODEL_NAME}_8tol.log" 2>&1 &
 
         # limit concurrency: if we have $MAX_JOBS running, wait for one to finish

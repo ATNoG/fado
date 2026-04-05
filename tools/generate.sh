@@ -6,7 +6,7 @@ set -e
 
 if [ "$#" -lt 3 ]; then
     echo "Usage: sudo ./generate [NUM] [NAME] [ARRAY of W]"
-    echo "Example: sudo ./generate 0 yaml_load 2 3 4"
+    echo "Example: sudo ./generate 0 YamlLoad 2 3 4"
     exit 1
 fi
 
@@ -18,7 +18,7 @@ for W in "$@"; do
     echo "=== Generating training and test data for W=$W ==="
     sudo venv/bin/python3 -m src.main -sc "$NUM" -w "$W" -fn "${NAME}_${W}_baseline" -l 2000000 -d 600 # 10 min
     sudo venv/bin/python3 -m src.main -sc "$NUM" -w "$W" -fn "${NAME}_${W}_test" -l 2000000 -d 600 -e # 10 min
-    sudo venv/bin/python3 -m src.cleanup_data data/logs/"${NAME}_${W}_baseline" data/logs/"${NAME}_${W}_test"
+    sudo venv/bin/python3 -m src.cleanup_data data/logs/"${NAME}_${W}_baseline".csv data/logs/"${NAME}_${W}_test".csv
 done
 
 # wait for all background jobs to finish

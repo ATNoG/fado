@@ -41,9 +41,6 @@ def acquire_data(scenario: BaseSimulation, queue: Queue[list[list[int]]], filena
             # write the new window data to the file
             for sequence in data:
                 output.write(f'{','.join(map(str, sequence))},{flag}\n')
-
-            # TODO: is this wrong?? (it was already duplicated!!)
-            counter += len(data) * window_size
             counter += len(data) * window_size
 
             # run the exploit if requested

@@ -17,6 +17,6 @@ DB     = Path.cwd() / 'data' / 'logs'
 MNTNSMAP = '/sys/fs/bpf/mnt_ns_set'
 
 IMAGE_MODEL_MAPPINGS = {
-    'yaml_load:v1': 'YamlLoad_5s_w2_20p',
-    'sentiment_analyzer:v1': 'SentimentAnalyzer_5s_w2_10p'
+    'yaml_load:v1': 'YamlLoadWithStartup_5s_w2_10p',
+    'sentiment_analyzer:v1': 'SentimentAnalyzerWithStartup_10s_w2_10p'
 }

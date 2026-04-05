@@ -15,7 +15,7 @@ MAX_JOBS=7
 
 # hard-coded parameter sets
 W_LIST=(2 3 4 6 8 10)
-STATES_LIST=(10 50 30 5)
+STATES_LIST=(5 10 30 50)
 
 echo "=== Starting model evaluation in parallel ${MAX_JOBS} ==="
 
@@ -25,7 +25,7 @@ for NAME in "${NAMES[@]}"; do
         for STATES in "${STATES_LIST[@]}"; do
             MODEL_NAME="${NAME}_${STATES}s_w${W}_10p"
             echo "Launching evaluation for ${MODEL_NAME}"
-            sudo venv/bin/python3 -m src.main -fn "$MODEL_NAME" --states "$STATES" -t "${NAME}_${W}_baseline" --test "${NAME}_${W}_test"
+            sudo venv/bin/python3 -m src.main -fn "$MODEL_NAME" --states "$STATES" -t "${NAME}_${W}_baseline" --test "${NAME}_${W}_test" \
                 > "eval/eval_${MODEL_NAME}.log" 2>&1 &
 
             # limit concurrency: if we have $MAX_JOBS running, wait for one to finish

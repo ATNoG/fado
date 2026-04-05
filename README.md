@@ -90,32 +90,41 @@ sudo venv/bin/python3 -m src.policy_controller
 
 ## Directory Tree
 ```
-├── config/                 # Contains the runtime configurations for the whole project (almost)
-├── data/                   # Contains generated files during training and testing
-│   ├── logs/               # Data captured for training and testing
-│   ├── models/             # Trained models
-│   └── stats/              # Trained Model statistics
+├── config/                                     # Contains the runtime configurations for the whole project (almost)
+├── data/                                       # Contains generated files during training and testing
+│   ├── logs/                                   # Data captured for training and testing
+│   ├── models/                                 # Trained models
+│   └── stats/                                  # Trained Model statistics
+├── k8s-cluster/                                # Documentation for creating a Kubernetes/Knative cluster
 ├── models/
 │   ├── bpf/
-│   │   ├── 
-│   │   └── 
+│   │   ├── bpf_probe.py
+│   │   ├── bpf_tracked_container.py
+│   │   ├── bpf_tracked_containers_registry.py
+│   │   └── bpf.program
 │   ├── __init__.py
-│   └── hmm.py              # Classification model (train/test routines)
+│   ├── base_simulation.py
+│   ├── hmm.py                                  # Classification model (train/test routines)
+│   ├── lid.py
+│   ├── scenario_manager.py
+│   └── security_alert.py
 ├── probe/
 │   ├── bcc/
 │   ├── __init__.py
-│   └── probe.py            # Probe logic with filtering and processing
-├── scenarios/              # Test scenarios
-│   ├── log4shell/          # S3
-│   ├── sentiment_analyzer/ # S1
-│   └── yaml_load/          # S2
-├── tools/                  # Additional tools
-├── src/                       
-│   ├── __init__.py
-│   ├── cleanup_data.py     # Apply the STIDE algorithm 
-│   ├── main.py             # Entry point
-│   ├── simulation.py       # Data Generation
-│   └── trace.py            # Dynamic Anomaly Detection
+│   ├── probe.py                                # Probe logic with filtering and processing
+│   └── sysdig.py
+├── scenarios/                                  # Test scenarios
+│   ├── log4shell/                              # S2
+│   ├── sentiment_analyzer/                     # S1
+│   └── yaml_load/                              # S0
+├── src/
+│   ├── cleanup_data.py                         # Apply the STIDE algorithm
+│   ├── main.py                                 # Entry point
+│   ├── policy_controller.py
+│   ├── simulation.py                           # Data Generation
+│   ├── trace_docker.py                         # Dynamic Docker Anomaly Detection
+│   └── trace_k8s.py                            # Dynamic Knative Anomaly Detection
+├── tools/                                      # Additional tools
 ├── README.md
 └── requirements.txt
 ```
