@@ -7,6 +7,9 @@ class SENTIMENTANALYZER(BaseSimulation):
         super().__init__()
         self.url = 'http://localhost:8080'
 
+    def setup(self):
+        pass
+
     def name(self) -> str:
         return 'SENTIMENT_ANALYZER'
 

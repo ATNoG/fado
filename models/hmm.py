@@ -237,6 +237,7 @@ class HMM:
         anom_idx = np.array([i for i, f in enumerate(tolerant_prediction_flags) if f == 1])
 
         sc = np.asarray(new_scores)
+        print(anom_idx)
         fn_idx = anom_idx[sc[anom_idx] < self.threshold]
 
         # true normals (predicted normal and above threshold)

@@ -11,6 +11,9 @@ class YAML_Load(BaseSimulation):
         self.data_dir.mkdir(parents=True, exist_ok=True)
         gen_data(self.data_dir)
 
+    def setup(self):
+        pass
+
     def name(self) -> str:
         return 'YAML_Unsafe_Load'
 

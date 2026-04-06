@@ -13,6 +13,7 @@ class BaseSimulation(ABC):
         return f'{file_name}{'_exploit' if self.run_exploit else ''}'
 
     def simulate(self, duration: int, stop_sim, run_exploit: bool):
+        self.setup()
         asyncio.run(self.trigger_api(duration, stop_sim, run_exploit))
 
     async def trigger_api(self, duration: int, stop_sim, run_exploit: bool):
@@ -68,6 +69,10 @@ class BaseSimulation(ABC):
 
     def set_run_exploit(self, run_exploit: bool):
         self.run_exploit = run_exploit
+
+    @abstractmethod
+    def setup(self):
+        pass
 
     @abstractmethod
     def name(self) -> str:

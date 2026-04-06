@@ -9,7 +9,7 @@ Adapted from [here](https://github.com/we45/DVFaaS-Damn-Vulnerable-Functions-as-
 ```bash
 cd src/backend/
 docker build -t yaml_load .
-docker run -p 8000:8000 -v /host/shared:/shared yaml_load
+docker run -d -p 8000:8000 -v /host/shared:/shared yaml_load
 ```
 Exposes port 8000
 
