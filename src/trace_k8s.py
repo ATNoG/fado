@@ -1,5 +1,5 @@
 from models import BpfTrackedContainer, BpfProbe, BpfTrackedContainersRegistry
-from config import MODELS, IMAGE_MODEL_MAPPINGS, MNTNSMAP
+from config import MODELS, IMAGE_MODEL_MAPPINGS, MNTNSMAP, MAX_QUEUE_SIZE
 from multiprocessing import Queue, set_start_method
 from kubernetes import config as K8sconfig
 from kubernetes.client import CoreV1Api
@@ -22,7 +22,7 @@ def add_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry, i
 
     ns_id = os.stat(f'/proc/{container_pid}/ns/mnt').st_ino
     model_path = MODELS / (IMAGE_MODEL_MAPPINGS[image] + '.pkl')
-    bpf_tracked_container = BpfTrackedContainer(image, container_id, model_path, pod_name, node_name, Queue(maxsize=1000))
+    bpf_tracked_container = BpfTrackedContainer(image, container_id, model_path, pod_name, node_name, Queue(maxsize=MAX_QUEUE_SIZE))
     if not containers_registry.add_container(ns_id, bpf_tracked_container):
         return
 

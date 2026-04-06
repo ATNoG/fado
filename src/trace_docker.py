@@ -1,7 +1,7 @@
 from models import BpfTrackedContainer, BpfProbe, BpfTrackedContainersRegistry, Scenario
-from config import MODELS, IMAGE_MODEL_MAPPINGS, MNTNSMAP
+from config import MODELS, IMAGE_MODEL_MAPPINGS, MNTNSMAP, MAX_QUEUE_SIZE
 from multiprocessing import Queue, set_start_method
-from probe.bcc import BPF
+from bcc import BPF
 import docker, os
 
 # TODO: this NEEDS to be started before any containers starts or those first containers will NOT be monitored (needs to be fixed)
@@ -21,7 +21,7 @@ def add_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry, i
     ns_id = os.stat(f'/proc/{container_pid}/ns/mnt').st_ino
 
     model_path = MODELS / (IMAGE_MODEL_MAPPINGS[f'{image}:v1'] + '.pkl')
-    bpf_tracked_container = BpfTrackedContainer(image, container_id, model_path, pod_name, node_name, Queue(maxsize=1000), run_process=run_process, apply_policies=False)
+    bpf_tracked_container = BpfTrackedContainer(image, container_id, model_path, pod_name, node_name, Queue(maxsize=MAX_QUEUE_SIZE), run_process=run_process, apply_policies=False)
     if not containers_registry.add_container(ns_id, bpf_tracked_container):
         return None
 

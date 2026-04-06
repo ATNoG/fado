@@ -13,6 +13,7 @@ def is_port_in_use(port, host='0.0.0.0'):
         return s.connect_ex((host, port)) == 0
 
 def ensure_port_available(port, host='0.0.0.0', timeout=65):
+    # kill the program using the port (if any)
     try:
         output = subprocess.check_output(f'lsof -t -i:{port}', shell=True, text=True, stderr=subprocess.DEVNULL)
         pids = [int(p) for p in output.strip().split('\n') if p]
@@ -25,6 +26,7 @@ def ensure_port_available(port, host='0.0.0.0', timeout=65):
     except subprocess.CalledProcessError:
         pass
 
+    # wait for the port to exit the TIME_WAIT status
     start_time = time.time()
     while time.time() - start_time < timeout:
         if not is_port_in_use(port, host=host):

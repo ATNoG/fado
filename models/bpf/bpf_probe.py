@@ -1,8 +1,9 @@
 from .bpf_tracked_containers_registry import BpfTrackedContainersRegistry
-from probe import BPF, filter_by_containers
+from bcc.containers import filter_by_containers
 from collections import defaultdict
 from dataclasses import dataclass
 from threading import Thread
+from bcc import BPF
 
 class BpfProbe:
     """Attaches to specific containers for probing"""

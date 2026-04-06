@@ -90,7 +90,8 @@ sudo venv/bin/python3 -m src.policy_controller
 
 ## Directory Tree
 ```
-├── config/                                     # Contains the runtime configurations for the whole project (almost)
+├── bcc/
+├── config/                                     # Contains the runtime configurations for the whole project
 ├── data/                                       # Contains generated files during training and testing
 │   ├── logs/                                   # Data captured for training and testing
 │   ├── models/                                 # Trained models
@@ -98,7 +99,7 @@ sudo venv/bin/python3 -m src.policy_controller
 ├── k8s-cluster/                                # Documentation for creating a Kubernetes/Knative cluster
 ├── models/
 │   ├── bpf/
-│   │   ├── bpf_probe.py
+│   │   ├── bpf_probe.py                        # eBPF Probe logic with filtering
 │   │   ├── bpf_tracked_container.py
 │   │   ├── bpf_tracked_containers_registry.py
 │   │   └── bpf.program
@@ -107,11 +108,7 @@ sudo venv/bin/python3 -m src.policy_controller
 │   ├── hmm.py                                  # Classification model (train/test routines)
 │   ├── lid.py
 │   ├── scenario_manager.py
-│   └── security_alert.py
-├── probe/
-│   ├── bcc/
-│   ├── __init__.py
-│   ├── probe.py                                # Probe logic with filtering and processing
+│   ├── security_alert.py
 │   └── sysdig.py
 ├── scenarios/                                  # Test scenarios
 │   ├── log4shell/                              # S2

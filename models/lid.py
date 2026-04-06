@@ -1,7 +1,7 @@
-from probe.bcc.syscall import syscalls
 from typing import Dict, List, Tuple
 from collections import defaultdict
 from dataclasses import dataclass
+from bcc.syscall import syscalls
 from pathlib import Path
 
 @dataclass(frozen=True)

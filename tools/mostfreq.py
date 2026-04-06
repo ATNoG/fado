@@ -1,5 +1,5 @@
 import sys, matplotlib.pyplot as plt, pandas as pd
-from probe.bcc.syscall import syscalls
+from bcc.syscall import syscalls
 from collections import Counter
 
 if len(sys.argv) < 2:
