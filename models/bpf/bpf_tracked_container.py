@@ -1,14 +1,15 @@
-from ..security_alert import SecurityAlert, AlertSeverity, SecurityMeasure
+from ..security_alert import SecurityAlert, AlertSeverity
 from multiprocessing import Process, Event, Queue
 from config import TOLERANCE, POLICY_CONTROLLER
 from numpy import isneginf, array as np_array
+from ..policy_config import ActionType
+import requests, subprocess, logging
 from collections import deque
-import requests, subprocess
 from pathlib import Path
 from pickle import load
 
 class BpfTrackedContainer:
-    """Represents a container being tracked by eBPF"""
+    '''Represents a container being tracked by eBPF'''
 
     def __init__(self, image: str, container_id: str, model_path: Path, pod_name: str, node_name: str, queue: Queue[list[list[int]]], run_process: bool=True, apply_policies=True):
         self.image = image
@@ -32,6 +33,15 @@ class BpfTrackedContainer:
             self.process_event = Event()
             self.process = Process(target=self.run, daemon=True)
             self.process.start()
+
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
+
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        handler.setFormatter(formatter)
+        if not self.logger.hasHandlers():
+            self.logger.addHandler(handler)
 
     def stop(self):
         if self.run_process:
@@ -63,28 +73,37 @@ class BpfTrackedContainer:
 
                 if sum(results) > len(results) * TOLERANCE:
                     print('[-] Anomaly detected')
-                    if self.apply_policies and self.apply_policy():
+                    if self.apply_policies and self.apply_policy(window):
                         return
 
             windows.clear()
 
-    def apply_policy(self) -> bool:
-        # TODO: what to do with the process after applying the policy??
+    def apply_policy(self, window: list[int]) -> bool:
         try:
-            security_alert = SecurityAlert(node_name=self.node_name, pod_name=self.pod_name, container_id=self.container_id, severity=AlertSeverity.High)
+            security_alert = SecurityAlert(node_name=self.node_name, pod_name=self.pod_name, container_id=self.container_id, severity=AlertSeverity.High, window=window)
             response = requests.post(f'{POLICY_CONTROLLER}/api/alerts', json=security_alert.model_dump(mode='json'), timeout=2)
             response.raise_for_status()
 
-            security_measure = SecurityMeasure(response.json())
-            match security_measure:
-                case SecurityMeasure.Nothing:
-                    pass
-                case SecurityMeasure.Kill:
-                    subprocess.run(['crictl', 'stop', '--timeout', '0', self.container_id], capture_output=True, text=True, check=True)
-                    print('Got "kill" as a security policy')
-                    return True
-                case _:
-                    raise RuntimeError('Invalid SecurityMeasure value.')
+            for action in response.json()['actions']:
+                action_type = ActionType(**action)
+                match action_type:
+                    case action_type.NOTHING:
+                        pass
+                    case action_type.LOG:
+                        print('Logging the anomaly...')
+                        self.logger.warning(f'SECURITY ALERT | '
+                            f'Node: {self.node_name} | '
+                            f'Pod: {self.node_name} | '
+                            f'Container ID: {self.container_id} | '
+                            f'Alert severity: {AlertSeverity.High} | '
+                            f'Window: {window}'
+                        )
+                    case action_type.KILL:
+                        subprocess.run(['crictl', 'stop', '--timeout', '0', self.container_id], capture_output=True, text=True, check=True)
+                        print('Kiling the container...')
+                        return True
+                    case _:
+                        raise RuntimeError('Invalid ActionType value.')
         except Exception as e:
             print(e)
             print('[WARNING] Could not get/apply policy for anomaly!')

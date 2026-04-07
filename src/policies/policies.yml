@@ -1,0 +1,19 @@
+rules:
+  - name: "Benign Background Noise"
+    match:
+      alert_severity: low
+    actions:
+      - nothing
+
+  - name: "Suspicious Activity"
+    match:
+      alert_severity: medium
+    actions:
+      - log
+
+  - name: "Critical Anomaly"
+    match:
+      alert_severity: high
+    actions:
+      - log
+      - kill

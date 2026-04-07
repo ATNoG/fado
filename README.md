@@ -130,5 +130,5 @@ sudo venv/bin/python3 -m src.policy_controller
 
 This repository is licensed under the GNU GENERAL PUBLIC LICENSE 3.0. For the complete license text, see the file LICENSE. This license applies to all files in this distribution, except as noted below.
 
-The bcc sub-directory within the probe directory is licensed under the Apache License. See the [bcc](./probe/bcc/) for the complete license text.
+The bcc directory is licensed under the Apache License. See [bcc](./bcc/LICENSE.txt) for the complete license text.
 The log4shell scenario reutilizes code that is licensed under the same license GNU GENERAL PUBLIC LICENSE 3.0.
