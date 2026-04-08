@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from .bpf_tracked_container import BpfTrackedContainer
 from multiprocessing import Queue
 from threading import Lock

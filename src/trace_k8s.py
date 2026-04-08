@@ -5,7 +5,7 @@ from kubernetes import config as K8sconfig
 from kubernetes.client import CoreV1Api
 import socket, os, subprocess, json
 from kubernetes.watch import Watch
-from probe import BPF
+from bcc import BPF
 
 def recreate_ebpf_map(mntnsmap: str):
     if os.path.exists(mntnsmap):

@@ -1,3 +1,6 @@
+# TODO: this is a hack to make this code work on older versions of Python. Should i switch to uv??
+from __future__ import annotations
+
 from ..security_alert import SecurityAlert, AlertSeverity
 from multiprocessing import Process, Event, Queue
 from config import TOLERANCE, POLICY_CONTROLLER
@@ -28,12 +31,6 @@ class BpfTrackedContainer:
         self.window_size = saved_data['window_size']
         self.whitelist = saved_data['whitelist']
 
-        if self.run_process:
-            self.apply_policies = apply_policies
-            self.process_event = Event()
-            self.process = Process(target=self.run, daemon=True)
-            self.process.start()
-
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
 
@@ -42,6 +39,12 @@ class BpfTrackedContainer:
         handler.setFormatter(formatter)
         if not self.logger.hasHandlers():
             self.logger.addHandler(handler)
+
+        if self.run_process:
+            self.apply_policies = apply_policies
+            self.process_event = Event()
+            self.process = Process(target=self.run, daemon=True)
+            self.process.start()
 
     def stop(self):
         if self.run_process:
@@ -85,18 +88,18 @@ class BpfTrackedContainer:
             response.raise_for_status()
 
             for action in response.json()['actions']:
-                action_type = ActionType(**action)
+                action_type = ActionType(action)
                 match action_type:
                     case action_type.NOTHING:
                         pass
                     case action_type.LOG:
                         print('Logging the anomaly...')
                         self.logger.warning(f'SECURITY ALERT | '
-                            f'Node: {self.node_name} | '
-                            f'Pod: {self.node_name} | '
-                            f'Container ID: {self.container_id} | '
-                            f'Alert severity: {AlertSeverity.High} | '
-                            f'Window: {window}'
+                            f'Node: {security_alert.node_name} | '
+                            f'Pod: {security_alert.node_name} | '
+                            f'Container ID: {security_alert.container_id} | '
+                            f'Alert severity: {security_alert.severity} | '
+                            f'Window: {security_alert.window}'
                         )
                     case action_type.KILL:
                         subprocess.run(['crictl', 'stop', '--timeout', '0', self.container_id], capture_output=True, text=True, check=True)

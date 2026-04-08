@@ -85,7 +85,7 @@ sudo venv/bin/python3 -m src.trace_k8s
 
 Run the policy controller (in a single place):
 ```bash
-sudo venv/bin/python3 -m src.policy_controller
+sudo venv/bin/python3 -m src.policies.policy_controller
 ```
 
 ## Directory Tree
