@@ -12,7 +12,7 @@ def recreate_ebpf_map(mntnsmap: str):
     if os.path.exists(mntnsmap):
         os.remove(mntnsmap)
 
-    bpf = BPF(text=f"""BPF_TABLE_PINNED("hash", u64, u32, mnt_ns_set, 128, "{mntnsmap}");""")
+    bpf = BPF(text=f'''BPF_TABLE_PINNED("hash", u64, u32, mnt_ns_set, 128, "{mntnsmap}");''')
     print('[+] eBPF map is setup...')
     return bpf.get_table('mnt_ns_set')
 
@@ -21,7 +21,7 @@ def add_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry, i
     ns_id = os.stat(f'/proc/{container_pid}/ns/mnt').st_ino
 
     model_path = MODELS / (IMAGE_MODEL_MAPPINGS[f'{image}:v1'] + '.pkl')
-    bpf_tracked_container = BpfTrackedContainer(image, container_id, model_path, pod_name, node_name, Queue(maxsize=MAX_QUEUE_SIZE), run_process=run_process, apply_policies=False)
+    bpf_tracked_container = BpfTrackedContainer(image, container_id, model_path, pod_name, node_name, Queue(maxsize=MAX_QUEUE_SIZE), None, run_process=run_process, apply_policies=False)
     if not containers_registry.add_container(ns_id, bpf_tracked_container):
         return None
 
@@ -41,7 +41,6 @@ def remove_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry
     print(f'[+] Container removed with ID: {container_id}')
 
 def containers_manager(ebpf_map, containers_registry: BpfTrackedContainersRegistry, track_scenario: Scenario | None = None) -> Queue[list[list[int]]]:
-    set_start_method('spawn')
     if track_scenario:
         print(f'[+] Waiting for a container with image {track_scenario.image_name} to start')
 
@@ -70,10 +69,15 @@ def containers_manager(ebpf_map, containers_registry: BpfTrackedContainersRegist
         elif container_action in ('die', 'stop', 'kill') and not track_scenario:
             remove_container(ebpf_map, containers_registry, container_id)
 
-    assert False, "Unreachable"
+    assert False, 'Unreachable'
 
 if __name__ == '__main__':
+    set_start_method('spawn')
+
+    # eBPF probing
     ebpf_map = recreate_ebpf_map(MNTNSMAP)
     containers_registry = BpfTrackedContainersRegistry()
     BpfProbe(containers_registry, MNTNSMAP)
+
+    # Docker container events
     containers_manager(ebpf_map, containers_registry)

@@ -6,5 +6,5 @@ spec:
   match:
     alert_severity: "high"
   actions:
-    - kill
     - log
+    - kill

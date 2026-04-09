@@ -1,26 +1,27 @@
 # TODO: this is a hack to make this code work on older versions of Python. Should i switch to uv??
 from __future__ import annotations
 
-from ..security_alert import SecurityAlert, AlertSeverity
 from multiprocessing import Process, Event, Queue
-from config import TOLERANCE, POLICY_CONTROLLER
 from numpy import isneginf, array as np_array
+from ..security_alert import AlertSeverity
 from ..policy_config import ActionType
-import requests, subprocess, logging
 from collections import deque
+from config import TOLERANCE
+import subprocess, logging
 from pathlib import Path
 from pickle import load
 
 class BpfTrackedContainer:
     '''Represents a container being tracked by eBPF'''
 
-    def __init__(self, image: str, container_id: str, model_path: Path, pod_name: str, node_name: str, queue: Queue[list[list[int]]], run_process: bool=True, apply_policies=True):
+    def __init__(self, image: str, container_id: str, model_path: Path, pod_name: str, node_name: str, queue: Queue[list[list[int]]], active_policies, run_process: bool=True, apply_policies=True):
         self.image = image
         self.container_id = container_id
         self.pod_name = pod_name
         self.node_name = node_name
         self.queue = queue
         self.run_process = run_process
+        self.active_policies = active_policies
 
         # load the model
         with open(model_path, 'rb') as f:
@@ -76,39 +77,49 @@ class BpfTrackedContainer:
 
                 if sum(results) > len(results) * TOLERANCE:
                     print('[-] Anomaly detected')
-                    if self.apply_policies and self.apply_policy(window):
+                    # TODO: always high alert severity??
+                    if self.apply_policies and self.apply_policy(AlertSeverity.High, window):
                         return
 
             windows.clear()
 
-    def apply_policy(self, window: list[int]) -> bool:
-        try:
-            security_alert = SecurityAlert(node_name=self.node_name, pod_name=self.pod_name, container_id=self.container_id, severity=AlertSeverity.High, window=window)
-            response = requests.post(f'{POLICY_CONTROLLER}/api/alerts', json=security_alert.model_dump(mode='json'), timeout=2)
-            response.raise_for_status()
+    def evaluate_alert(self, alert_severity: AlertSeverity) -> list[ActionType]:
+        # must be a list to ensure action order
+        triggered_actions: list[ActionType] = []
 
-            for action in response.json()['actions']:
-                action_type = ActionType(action)
-                match action_type:
-                    case action_type.NOTHING:
-                        pass
-                    case action_type.LOG:
-                        print('Logging the anomaly...')
-                        self.logger.warning(f'SECURITY ALERT | '
-                            f'Node: {security_alert.node_name} | '
-                            f'Pod: {security_alert.node_name} | '
-                            f'Container ID: {security_alert.container_id} | '
-                            f'Alert severity: {security_alert.severity} | '
-                            f'Window: {security_alert.window}'
-                        )
-                    case action_type.KILL:
-                        subprocess.run(['crictl', 'stop', '--timeout', '0', self.container_id], capture_output=True, text=True, check=True)
-                        print('Kiling the container...')
-                        return True
-                    case _:
-                        raise RuntimeError('Invalid ActionType value.')
-        except Exception as e:
-            print(e)
-            print('[WARNING] Could not get/apply policy for anomaly!')
+        for rule in self.active_policies.values():
+            if rule.match.alert_severity != alert_severity:
+                continue
+
+            for action in rule.actions:
+                if action not in triggered_actions:
+                    triggered_actions.append(action)
+
+        if not triggered_actions:
+            return [ActionType.NOTHING]
+
+        return triggered_actions
+
+    def apply_policy(self, alert_severity: AlertSeverity, window: list[int]) -> bool:
+        actions = self.evaluate_alert(alert_severity)
+        print(actions)
+        for action in actions:
+            match action:
+                case ActionType.NOTHING:
+                    pass
+                case ActionType.LOG:
+                    self.logger.warning(f'SECURITY ALERT | '
+                        f'Node: {self.node_name} | '
+                        f'Pod: {self.pod_name} | '
+                        f'Container ID: {self.container_id} | '
+                        f'Alert severity: {alert_severity} | '
+                        f'Window: {window}'
+                    )
+                case ActionType.KILL:
+                    subprocess.run(['crictl', 'stop', '--timeout', '0', self.container_id], capture_output=True, text=True, check=True)
+                    print('    ⮡ Kiling the container...')
+                    return True
+                case _:
+                    raise RuntimeError('Invalid ActionType value.')
 
         return False

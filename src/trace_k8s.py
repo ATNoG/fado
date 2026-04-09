@@ -1,8 +1,8 @@
-from models import BpfTrackedContainer, BpfProbe, BpfTrackedContainersRegistry
+from models import BpfTrackedContainer, BpfProbe, BpfTrackedContainersRegistry, PolicyRule
 from config import MODELS, IMAGE_MODEL_MAPPINGS, MNTNSMAP, MAX_QUEUE_SIZE
-from multiprocessing import Queue, set_start_method
+from multiprocessing import Process, Queue, set_start_method, Manager
+from kubernetes.client import CoreV1Api, CustomObjectsApi
 from kubernetes import config as K8sconfig
-from kubernetes.client import CoreV1Api
 import socket, os, subprocess, json
 from kubernetes.watch import Watch
 from bcc import BPF
@@ -11,18 +11,18 @@ def recreate_ebpf_map(mntnsmap: str):
     if os.path.exists(mntnsmap):
         os.remove(mntnsmap)
 
-    bpf = BPF(text=f"""BPF_TABLE_PINNED("hash", u64, u32, mnt_ns_set, 128, "{mntnsmap}");""")
+    bpf = BPF(text=f'''BPF_TABLE_PINNED("hash", u64, u32, mnt_ns_set, 128, "{mntnsmap}");''')
     print('[+] eBPF map is setup...')
     return bpf.get_table('mnt_ns_set')
 
-def add_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry, image: str, container_id: str, pod_name: str, node_name: str):
+def add_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry, image: str, container_id: str, pod_name: str, node_name: str, active_policies):
     # get the PID from the local container runtime and the respective namespace id
     result = subprocess.run(['crictl', 'inspect', container_id], capture_output=True, text=True, check=True)
     container_pid = json.loads(result.stdout)['info']['pid']
 
     ns_id = os.stat(f'/proc/{container_pid}/ns/mnt').st_ino
     model_path = MODELS / (IMAGE_MODEL_MAPPINGS[image] + '.pkl')
-    bpf_tracked_container = BpfTrackedContainer(image, container_id, model_path, pod_name, node_name, Queue(maxsize=MAX_QUEUE_SIZE))
+    bpf_tracked_container = BpfTrackedContainer(image, container_id, model_path, pod_name, node_name, Queue(maxsize=MAX_QUEUE_SIZE), active_policies)
     if not containers_registry.add_container(ns_id, bpf_tracked_container):
         return
 
@@ -40,10 +40,9 @@ def remove_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry
     del ebpf_map[key]
     print(f'[+] Container removed with ID: {container_id}')
 
-def containers_manager(ebpf_map, containers_registry: BpfTrackedContainersRegistry):
-    set_start_method('spawn')
-    node_name = socket.gethostname()
+def containers_manager(ebpf_map, active_policies, containers_registry: BpfTrackedContainersRegistry):
     K8sconfig.load_kube_config(config_file='/etc/kubernetes/kubelet.conf')
+    node_name = socket.gethostname()
     node_selector = f'spec.nodeName={node_name}'
     for event in Watch().stream(CoreV1Api().list_namespaced_pod, namespace='default', field_selector=node_selector):
         # the other event types are not usefull
@@ -81,19 +80,55 @@ def containers_manager(ebpf_map, containers_registry: BpfTrackedContainersRegist
                 if not container_status.state or not container_status.state.running:
                     continue
 
-                current_cid = container_status.container_id.split("://")[-1]
+                current_cid = container_status.container_id.split('://')[-1]
                 if old_cid == None or old_cid != current_cid:
                     # the container was restarted, we must clean up and re-add the container
                     if old_cid != None:
                         remove_container(ebpf_map, containers_registry, old_cid)
                         print('    ⮡ Container restart')
 
-                    add_container(ebpf_map, containers_registry, container_image, current_cid, pod_name, node_name)
+                    add_container(ebpf_map, containers_registry, container_image, current_cid, pod_name, node_name, active_policies)
 
                 break
 
+def watch_policies(active_policies):
+    print('[+] Starting Policy Engine...')
+    K8sconfig.load_kube_config(config_file='/etc/kubernetes/kubelet.conf')
+    stream = Watch().stream(CustomObjectsApi().list_cluster_custom_object, group='security.ua.com', version='v1', plural='securitypolicies')
+    for event in stream:
+        # the other event types are not usefull
+        if type(event) != dict:
+            continue
+
+        event_type = event['type']
+        obj = event['object']
+        policy_name = obj['metadata']['name']
+
+        if event_type in ['ADDED', 'MODIFIED']:
+            try:
+                rule = PolicyRule(**obj['spec'])
+                active_policies[policy_name] = rule
+                print(f'[Policy Engine] Loaded/Updated: {policy_name}')
+            except Exception as e:
+                print(f'[Policy Engine] Parse Error "{policy_name}": {e}')
+
+        elif event_type == 'DELETED':
+            if policy_name in active_policies:
+                del active_policies[policy_name]
+                print(f'[Policy Engine] Removed: {policy_name}')
+
 if __name__ == '__main__':
+    set_start_method('spawn')
+
+    # policies watcher
+    active_policies = Manager().dict()
+    policy_process = Process(target=watch_policies, args=(active_policies,), daemon=True)
+    policy_process.start()
+
+    # eBPF probing
     ebpf_map = recreate_ebpf_map(MNTNSMAP)
     containers_registry = BpfTrackedContainersRegistry()
     BpfProbe(containers_registry, MNTNSMAP)
-    containers_manager(ebpf_map, containers_registry)
+
+    # k8s container events
+    containers_manager(ebpf_map, active_policies, containers_registry)

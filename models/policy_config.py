@@ -11,7 +11,6 @@ class MatchCriteria(BaseModel):
     alert_severity: AlertSeverity
 
 class PolicyRule(BaseModel):
-    name: str
     match: MatchCriteria
     actions: list[ActionType]
 
