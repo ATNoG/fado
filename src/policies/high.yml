@@ -1,0 +1,10 @@
+apiVersion: security.ua.com/v1
+kind: SecurityPolicy
+metadata:
+  name: block-critical-anomalies
+spec:
+  match:
+    alert_severity: "high"
+  actions:
+    - kill
+    - log

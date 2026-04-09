@@ -1,0 +1,9 @@
+apiVersion: security.ua.com/v1
+kind: SecurityPolicy
+metadata:
+  name: block-benign-background-noise
+spec:
+  match:
+    alert_severity: "low"
+  actions:
+    - nothing

@@ -1,0 +1,9 @@
+apiVersion: security.ua.com/v1
+kind: SecurityPolicy
+metadata:
+  name: block-suspicious-activity
+spec:
+  match:
+    alert_severity: "medium"
+  actions:
+    - log
