@@ -23,5 +23,5 @@ kubectl delete -f src/policies/policies.yml
 # Apply permissions
 Give the nodes permissions to read the policies:
 ```bash
-kubectl apply -f src/policies/rbac-nodes.yaml
+kubectl apply -f src/policies/rbac-nodes.yml
 ```
