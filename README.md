@@ -108,8 +108,7 @@ sudo venv/bin/python3 -m src.policies.policy_controller
 │   ├── hmm.py                                  # Classification model (train/test routines)
 │   ├── lid.py
 │   ├── scenario_manager.py
-│   ├── security_alert.py
-│   └── sysdig.py
+│   └── security_alert.py
 ├── scenarios/                                  # Test scenarios
 │   ├── log4shell/                              # S2
 │   ├── sentiment_analyzer/                     # S1

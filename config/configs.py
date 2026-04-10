@@ -2,8 +2,6 @@ from pathlib import Path
 
 #### GENERAL CONFIGS ####
 
-POLICY_CONTROLLER = 'http://localhost:8000'
-
 TOLERANCE = 0.6
 WHITELIST_FREQUENCY = 0.1
 

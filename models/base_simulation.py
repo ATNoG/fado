@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
-import aiohttp, asyncio
+import aiohttp, asyncio, random
 from time import time
-import random
 
 class BaseSimulation(ABC):
     def __init__(self):

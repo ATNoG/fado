@@ -1,0 +1,34 @@
+apiVersion: security.ua.com/v1
+kind: SecurityPolicy
+metadata:
+  name: block-critical-anomalies
+spec:
+  match:
+    alert_severity: "high"
+  actions:
+    - log
+    - kill
+
+---
+
+apiVersion: security.ua.com/v1
+kind: SecurityPolicy
+metadata:
+  name: block-suspicious-activity
+spec:
+  match:
+    alert_severity: "medium"
+  actions:
+    - log
+
+---
+
+apiVersion: security.ua.com/v1
+kind: SecurityPolicy
+metadata:
+  name: block-benign-background-noise
+spec:
+  match:
+    alert_severity: "low"
+  actions:
+    - nothing

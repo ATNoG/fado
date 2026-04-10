@@ -9,6 +9,4 @@ psutil
 objgraph
 docker
 kubernetes
-fastapi
-uvicorn
 pydantic

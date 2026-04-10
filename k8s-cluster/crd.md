@@ -12,14 +12,12 @@ kubectl delete crd securitypolicies.security.ua.com # or kubectl delete -f src/p
 # Apply the policies themselves
 To apply the 3 existing policies:
 ```bash
-kubectl apply -f src/policies/low.yml
-kubectl apply -f src/policies/medium.yml
-kubectl apply -f src/policies/high.yml
+kubectl apply -f src/policies/policies.yml
 ```
 
-And to remove them (for example, for high) (if needed for some reason):
+And to remove them (if needed for some reason):
 ```bash
-kubectl delete sp block-critical-anomalies # or kubectl delete -f src/policies/high.yml
+kubectl delete -f src/policies/policies.yml
 ```
 
 # Apply permissions

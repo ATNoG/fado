@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from multiprocessing import Process, Event, Queue
 from numpy import isneginf, array as np_array
-from ..security_alert import AlertSeverity
-from ..policy_config import ActionType
+from ..alert_severity import AlertSeverity
+from ..policy_rule import ActionType
 from collections import deque
 from config import TOLERANCE
 import subprocess, logging
@@ -101,9 +101,7 @@ class BpfTrackedContainer:
         return triggered_actions
 
     def apply_policy(self, alert_severity: AlertSeverity, window: list[int]) -> bool:
-        actions = self.evaluate_alert(alert_severity)
-        print(actions)
-        for action in actions:
+        for action in self.evaluate_alert(alert_severity):
             match action:
                 case ActionType.NOTHING:
                     pass
@@ -117,7 +115,6 @@ class BpfTrackedContainer:
                     )
                 case ActionType.KILL:
                     subprocess.run(['crictl', 'stop', '--timeout', '0', self.container_id], capture_output=True, text=True, check=True)
-                    print('    ⮡ Kiling the container...')
                     return True
                 case _:
                     raise RuntimeError('Invalid ActionType value.')

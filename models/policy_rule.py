@@ -1,4 +1,4 @@
-from .security_alert import AlertSeverity
+from .alert_severity import AlertSeverity
 from pydantic import BaseModel
 from enum import Enum
 
@@ -13,6 +13,3 @@ class MatchCriteria(BaseModel):
 class PolicyRule(BaseModel):
     match: MatchCriteria
     actions: list[ActionType]
-
-class PolicyConfig(BaseModel):
-    rules: list[PolicyRule]

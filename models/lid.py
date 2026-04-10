@@ -8,7 +8,7 @@ from pathlib import Path
 class Event:
     ts_ns: int
     tid: int
-    syscall_id: int  # mapped via syscall_map
+    syscall_id: int # mapped via syscall_map
 
 def parse_events_from_csv(path: str | Path, syscall_map: Dict[str, int], require_in_map: bool = True) -> List[Event]:
     """
