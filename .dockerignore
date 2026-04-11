@@ -1,0 +1,26 @@
+# git
+.git
+.gitignore
+
+# docker
+.dockerignore
+
+# python
+__pycache__/
+*.pyc
+venv/
+.env
+
+# random folders
+data/logs/
+data/stats/
+k8s-cluster/
+scenarios/
+src/daemonset/
+src/policies/
+tools/
+
+# random files
+CITATION.cff
+LICENSE
+README.md
