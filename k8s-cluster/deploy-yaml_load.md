@@ -1,6 +1,6 @@
 # Deploy the `yaml_load` docker image to Knative
 This requires the `yaml_load` image to be built.
-```
+```bash
 docker tag yaml_load:latest dev.local/yaml_load:v1
 docker save dev.local/yaml_load:v1 -o yaml_load.tar
 ```

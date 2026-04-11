@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Usage: ./k8s_brute_forcing
+# Example: ./k8s_brute_forcing
 
 set -e
 

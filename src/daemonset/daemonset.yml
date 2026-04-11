@@ -24,8 +24,8 @@ spec:
 
       containers:
         - name: agent
-          image: ebpf-security-agent:v1
-          imagePullPolicy: Always
+          image: dev.local/security-agent:v1
+          imagePullPolicy: Never
 
           securityContext:
             privileged: false

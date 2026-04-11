@@ -20,7 +20,8 @@ And to remove them (if needed for some reason):
 kubectl delete -f src/policies/policies.yml
 ```
 
-# Apply permissions
+# If running the code outside of the DaemonSet
+## Apply permissions
 Give the nodes permissions to read the policies:
 ```bash
 kubectl apply -f src/policies/rbac-nodes.yml

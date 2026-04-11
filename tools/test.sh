@@ -1,12 +1,12 @@
 #!/bin/bash
-# Usage: sudo ./generate [NAME]
-# Example: sudo ./generate YamlLoad
+# Usage: sudo ./test [NAME]
+# Example: sudo ./test YamlLoad
 
 set -e
 
 if [ "$#" -lt 1 ]; then
-    echo "Usage: sudo ./generate [NAME]"
-    echo "Example: sudo ./generate YamlLoad"
+    echo "Usage: sudo ./test [NAME]"
+    echo "Example: sudo ./test YamlLoad"
     exit 1
 fi
 
