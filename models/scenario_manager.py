@@ -1,4 +1,3 @@
-from scenarios import yaml_load, sentiment_analyzer, log4shell
 from .base_simulation import BaseSimulation
 from enum import Enum
 
@@ -19,6 +18,7 @@ class Scenario(Enum):
 
 class ScenarioManager:
     def __init__(self):
+        from scenarios import yaml_load, sentiment_analyzer, log4shell
         self.registry = {
             Scenario.YAML_LOAD: yaml_load.get_scenario,
             Scenario.SENTIMENTANALYER: sentiment_analyzer.get_scenario,

@@ -5,15 +5,16 @@ from kubernetes.client import CoreV1Api, CustomObjectsApi
 from kubernetes import config as K8sconfig
 import socket, os, subprocess, json
 from kubernetes.watch import Watch
+from bcc.table import HashTable
 from bcc import BPF
 
 def recreate_ebpf_map(mntnsmap: str):
-    if os.path.exists(mntnsmap):
-        os.remove(mntnsmap)
-
     bpf = BPF(text=f'''BPF_TABLE_PINNED("hash", u64, u32, mnt_ns_set, 128, "{mntnsmap}");''')
+    bpf_map = bpf.get_table('mnt_ns_set')
+    assert isinstance(bpf_map, HashTable)
+    bpf_map.clear()
     print('[+] eBPF map is setup...')
-    return bpf.get_table('mnt_ns_set')
+    return bpf_map
 
 def add_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry, image: str, container_id: str, pod_name: str, node_name: str, active_policies):
     # get the PID from the local container runtime and the respective namespace id

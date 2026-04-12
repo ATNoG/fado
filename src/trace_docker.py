@@ -1,6 +1,7 @@
 from models import BpfTrackedContainer, BpfProbe, BpfTrackedContainersRegistry, Scenario
 from config import MODELS, IMAGE_MODEL_MAPPINGS, MNTNSMAP, MAX_QUEUE_SIZE
 from multiprocessing import Queue, set_start_method
+from bcc.table import HashTable
 from bcc import BPF
 import docker, os
 
@@ -9,12 +10,12 @@ import docker, os
 client = docker.DockerClient()
 
 def recreate_ebpf_map(mntnsmap: str):
-    if os.path.exists(mntnsmap):
-        os.remove(mntnsmap)
-
     bpf = BPF(text=f'''BPF_TABLE_PINNED("hash", u64, u32, mnt_ns_set, 128, "{mntnsmap}");''')
+    bpf_map = bpf.get_table('mnt_ns_set')
+    assert isinstance(bpf_map, HashTable)
+    bpf_map.clear()
     print('[+] eBPF map is setup...')
-    return bpf.get_table('mnt_ns_set')
+    return bpf_map
 
 def add_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry, image: str, container_id: str, pod_name: str, node_name: str, run_process: bool=True) -> int | None:
     container_pid = client.containers.get(container_id).attrs['State']['Pid']

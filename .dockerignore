@@ -19,6 +19,8 @@ scenarios/
 src/daemonset/
 src/policies/
 tools/
+data/eval/
+data/figs/
 
 # random files
 CITATION.cff
