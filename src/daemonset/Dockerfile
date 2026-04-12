@@ -37,3 +37,5 @@ COPY . .
 
 # install app dependencies
 RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
+
+CMD ["python3", "-m", "src.trace_k8s"]
