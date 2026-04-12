@@ -41,8 +41,14 @@ def remove_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry
     del ebpf_map[key]
     print(f'[+] Container removed with ID: {container_id}')
 
+def load_k8s_config():
+    try:
+        K8sconfig.load_incluster_config()
+    except K8sconfig.ConfigException:
+        K8sconfig.load_kube_config(config_file='/etc/kubernetes/kubelet.conf')
+
 def containers_manager(ebpf_map, active_policies, containers_registry: BpfTrackedContainersRegistry):
-    K8sconfig.load_kube_config(config_file='/etc/kubernetes/kubelet.conf')
+    load_k8s_config()
     node_name = socket.gethostname()
     node_selector = f'spec.nodeName={node_name}'
     for event in Watch().stream(CoreV1Api().list_namespaced_pod, namespace='default', field_selector=node_selector):
@@ -94,7 +100,7 @@ def containers_manager(ebpf_map, active_policies, containers_registry: BpfTracke
 
 def watch_policies(active_policies):
     print('[+] Starting Policy Engine...')
-    K8sconfig.load_kube_config(config_file='/etc/kubernetes/kubelet.conf')
+    load_k8s_config()
     stream = Watch().stream(CustomObjectsApi().list_cluster_custom_object, group='security.ua.com', version='v1', plural='securitypolicies')
     for event in stream:
         # the other event types are not usefull

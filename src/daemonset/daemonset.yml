@@ -36,6 +36,7 @@ spec:
                 - SYS_ADMIN
                 - SYS_RESOURCE
                 - SYS_PTRACE
+                - SYS_MODULE
                 - DAC_OVERRIDE
                 - IPC_LOCK
 
@@ -54,7 +55,9 @@ spec:
               mountPath: /lib/modules
               readOnly: true
             - name: container-sock
-              mountPath: /run/containerd/containerd.sock 
+              mountPath: /run/containerd/containerd.sock
+            - name: sys-fs-bpf
+              mountPath: /sys/fs/bpf
 
       volumes:
         - name: sys-kernel-debug
@@ -66,3 +69,6 @@ spec:
         - name: container-sock
           hostPath:
             path: /run/containerd/containerd.sock
+        - name: sys-fs-bpf
+          hostPath:
+            path: /sys/fs/bpf
