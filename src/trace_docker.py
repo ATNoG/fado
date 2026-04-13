@@ -1,22 +1,21 @@
 from models import BpfTrackedContainer, BpfProbe, BpfTrackedContainersRegistry, Scenario
-from config import MODELS, IMAGE_MODEL_MAPPINGS, MNTNSMAP, MAX_QUEUE_SIZE
+from config import MODELS, IMAGE_MODEL_MAPPINGS, MAX_QUEUE_SIZE
 from multiprocessing import Queue, set_start_method
-# from bcc.table import HashTable
-# from bcc import BPF
-import docker, os
+from bcc.table import HashTable
+from docker import DockerClient
+from bcc import BPF
+import os
 
 # TODO: this NEEDS to be started before any containers starts or those first containers will NOT be monitored (needs to be fixed)
 
-client = docker.DockerClient()
+client = DockerClient()
 
-# def recreate_ebpf_map(mntnsmap: str):
-#     # bpf = BPF(text=f'''BPF_TABLE_PINNED("hash", u64, u32, mnt_ns_set, 128, "{mntnsmap}");''')
-#     bpf = BPF(text='''BPF_HASH(mnt_ns_set, u64, u32, 128);''')
-#     # bpf_map = bpf.get_table('mnt_ns_set')
-#     # assert isinstance(bpf_map, HashTable)
-#     # bpf_map.clear()
-#     print('[+] eBPF map is setup...')
-#     return bpf.get_table('mnt_ns_set')
+def create_ebpf_map() -> tuple[BPF, HashTable]:
+    text = open('./src/bpf/bpf.program', 'r').read()
+    ebpf = BPF(text=text, cflags=['-Wno-microsoft-anon-tag', '-fms-extensions'])
+    ebpf_map = ebpf.get_table('mnt_ns_set')
+    print('[+] eBPF map is setup...')
+    return (ebpf, ebpf_map)
 
 def add_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry, image: str, container_id: str, pod_name: str, node_name: str, run_process: bool=True) -> int | None:
     container_pid = client.containers.get(container_id).attrs['State']['Pid']
@@ -77,10 +76,9 @@ if __name__ == '__main__':
     set_start_method('spawn')
 
     # eBPF probing
-    # ebpf_map = recreate_ebpf_map(MNTNSMAP)
+    ebpf, ebpf_map = create_ebpf_map()
     containers_registry = BpfTrackedContainersRegistry()
-    a = BpfProbe(containers_registry, MNTNSMAP)
-    ebpf_map = a.bruh()
+    BpfProbe(containers_registry, ebpf)
 
     # Docker container events
     containers_manager(ebpf_map, containers_registry)

@@ -4,23 +4,20 @@ from threading import Thread
 from bcc import BPF
 
 class BpfProbe:
-    """Attaches to specific containers for probing"""
+    '''Attaches to specific containers for probing'''
 
-    def __init__(self, container_registry: BpfTrackedContainersRegistry, mntnsmap: str):
-        bpf = open('./models/bpf/bpf.program', 'r').read()
-        self.bpf = BPF(text=bpf, cflags=['-Wno-microsoft-anon-tag', '-fms-extensions'])
+    def __init__(self, container_registry: BpfTrackedContainersRegistry, ebpf: BPF):
         self.container_registry = container_registry
+        self.ebpf = ebpf
+
         self.thread = Thread(target=self.monitor, daemon=True)
         self.thread.start()
-
-    def bruh(self):
-        return self.bpf.get_table('mnt_ns_set')
 
     def monitor(self):
         tmp_windows = defaultdict(list)
 
         def handle_event(cpu, data, size):
-            event = self.bpf['events'].event(data)
+            event = self.ebpf['events'].event(data)
             tmp_windows[event.tid].append(event.sid)
 
             queue = self.container_registry.get_container_queue(event.mnt_ns_id)
@@ -40,13 +37,13 @@ class BpfProbe:
                     pass
 
         # register callback
-        self.bpf['events'].open_ring_buffer(handle_event)
+        self.ebpf['events'].open_ring_buffer(handle_event)
 
         # event-driven loop (blocks until new data)
         while True:
             # blocks until events arrive, then triggers handle_event()
-            self.bpf.ring_buffer_poll()
+            self.ebpf.ring_buffer_poll()
 
     # TODO: what about stopping the thread??
     def stop(self):
-        self.bpf.detach_tracepoint(b'raw_syscalls:sys_exit')
+        self.ebpf.detach_tracepoint(b'raw_syscalls:sys_exit')

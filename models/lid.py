@@ -1,8 +1,9 @@
-from typing import Dict, List, Tuple
 from collections import defaultdict
 from dataclasses import dataclass
 from bcc.syscall import syscalls
 from pathlib import Path
+
+# TODO: is this even used??
 
 @dataclass(frozen=True)
 class Event:
@@ -10,20 +11,21 @@ class Event:
     tid: int
     syscall_id: int # mapped via syscall_map
 
-def parse_events_from_csv(path: str | Path, syscall_map: Dict[str, int], require_in_map: bool = True) -> List[Event]:
-    """
+def parse_events_from_csv(path: str | Path, syscall_map: dict[str, int], require_in_map: bool = True) -> list[Event]:
+    '''
     Parse a whitespace-delimited 'CSV' like the sample.
     Keeps only rows with direction '<'. Maps syscall to ID via syscall_map.
 
     Columns expected (at least first 7 tokens):
       0 ts_ns, 1 cpu, 2 pid, 3 comm, 4 tid, 5 syscall, 6 direction ('<' or '>')
-    """
-    events: List[Event] = []
+    '''
+
+    events: list[Event] = []
     p = Path(path)
-    with p.open("r", encoding="utf-8", errors="ignore") as f:
+    with p.open('r', encoding='utf-8', errors='ignore') as f:
         for line in f:
             line = line.strip()
-            if not line or line.startswith("#"):
+            if not line or line.startswith('#'):
                 continue
             # We only need first 7 tokens; the rest is args we ignore.
             # Split conservatively to avoid exploding on long arg strings.
@@ -35,7 +37,7 @@ def parse_events_from_csv(path: str | Path, syscall_map: Dict[str, int], require
             # direction_and_rest starts with '<' or '>' then the remainder.
             direction = direction_and_rest.split(maxsplit=1)[0]
 
-            if direction != "<":
+            if direction != '<':
                 continue
 
             if (sid := syscall_map.get(syscall)) is None:
@@ -53,13 +55,14 @@ def parse_events_from_csv(path: str | Path, syscall_map: Dict[str, int], require
                 continue
 
             events.append(Event(ts_ns=ts_ns, tid=tid, syscall_id=sid))
-    # Ensure chronological order
+
+    # ensure chronological order
     events.sort(key=lambda e: e.ts_ns)
 
     return events
 
-def group_windows_by_interval_and_tid(events: List[Event], n: int, interval_seconds: int = 5) -> Dict[int, Dict[int, List[Tuple[int, ...]]]]:
-    """
+def group_windows_by_interval_and_tid(events: list[Event], n: int, interval_seconds: int = 5) -> dict[int, dict[int, list[tuple[int, ...]]]]:
+    '''
     Returns:
       windows[interval_index][tid] = list of windows (each window is a tuple of syscall_ids)
 
@@ -68,9 +71,10 @@ def group_windows_by_interval_and_tid(events: List[Event], n: int, interval_seco
       the entries are carried over to the *next* interval; no windows produced yet.
     - If there are >= n entries (after carry-in), windows are produced from *all*
       accumulated entries for that interval, then carry is cleared.
-    """
+    '''
+
     if n <= 0:
-        raise ValueError("Window size n must be > 0")
+        raise ValueError('Window size n must be > 0')
     if not events:
         return {}
 
@@ -78,17 +82,17 @@ def group_windows_by_interval_and_tid(events: List[Event], n: int, interval_seco
     start_ts = events[0].ts_ns
     end_ts = events[-1].ts_ns
 
-    # Bucket events into interval -> tid -> list[syscall_id]
-    buckets: Dict[int, Dict[int, List[int]]] = defaultdict(lambda: defaultdict(list))
+    # bucket events into interval -> tid -> list[syscall_id]
+    buckets: dict[int, dict[int, list[int]]] = defaultdict(lambda: defaultdict(list))
     for e in events:
         idx = (e.ts_ns - start_ts) // interval_ns
         buckets[idx][e.tid].append(e.syscall_id)
 
-    # Carry-over per TID (across intervals)
-    carry: Dict[int, List[int]] = defaultdict(list)
+    # carry-over per TID (across intervals)
+    carry: dict[int, list[int]] = defaultdict(list)
 
     # Produce windows
-    windows: Dict[int, Dict[int, List[Tuple[int, ...]]]] = defaultdict(lambda: defaultdict(list))
+    windows: dict[int, dict[int, list[tuple[int, ...]]]] = defaultdict(lambda: defaultdict(list))
 
     for interval_idx in sorted(buckets.keys()):
         per_tid = buckets[interval_idx]
@@ -109,7 +113,7 @@ def group_windows_by_interval_and_tid(events: List[Event], n: int, interval_seco
                 continue
 
             # Enough entries: create step-1 sliding windows from the accumulated seq
-            tid_windows: List[Tuple[int, ...]] = []
+            tid_windows: list[tuple[int, ...]] = []
             for i in range(0, len(seq) - n + 1):
                 tid_windows.append(tuple(seq[i : i + n]))
 
@@ -120,21 +124,21 @@ def group_windows_by_interval_and_tid(events: List[Event], n: int, interval_seco
 
     return windows
 
-# ---- Example usage ----
-if __name__ == "__main__":
+# ---- example usage ----
+if __name__ == '__main__':
     syscalls = {v.decode(): k for k, v in syscalls.items()}
 
-    events = parse_events_from_csv("models/abundant_buck_7911.sc", syscalls)
+    events = parse_events_from_csv('models/abundant_buck_7911.sc', syscalls)
     windows = group_windows_by_interval_and_tid(events, n=3, interval_seconds=5)
 
     # Pretty-print result
     counter = 0
-    with open("models/lid.txt", 'w') as f:
+    with open('models/lid.txt', 'w') as f:
         for ival in sorted(windows):
             for tid in sorted(windows[ival]):
                 for window in windows[ival][tid]:
                     counter += 1
-                    f.write(str(ival) + " " + ",".join([str(w) for w in window]) + "\n")
+                    f.write(str(ival) + ' ' + ','.join([str(w) for w in window]) + '\n')
 
     f.close()
     print(counter)

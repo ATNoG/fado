@@ -1,6 +1,6 @@
 from models import BpfTrackedContainer, BpfProbe, BpfTrackedContainersRegistry, PolicyRule
-from config import MODELS, IMAGE_MODEL_MAPPINGS, MNTNSMAP, MAX_QUEUE_SIZE
 from multiprocessing import Process, Queue, set_start_method, Manager
+from config import MODELS, IMAGE_MODEL_MAPPINGS, MAX_QUEUE_SIZE
 from kubernetes.client import CoreV1Api, CustomObjectsApi
 from kubernetes import config as K8sconfig
 import socket, os, subprocess, json
@@ -8,13 +8,12 @@ from kubernetes.watch import Watch
 from bcc.table import HashTable
 from bcc import BPF
 
-def recreate_ebpf_map(mntnsmap: str):
-    bpf = BPF(text=f'''BPF_TABLE_PINNED("hash", u64, u32, mnt_ns_set, 128, "{mntnsmap}");''')
-    bpf_map = bpf.get_table('mnt_ns_set')
-    assert isinstance(bpf_map, HashTable)
-    bpf_map.clear()
+def create_ebpf_map() -> tuple[BPF, HashTable]:
+    text = open('./src/bpf/bpf.program', 'r').read()
+    ebpf = BPF(text=text, cflags=['-Wno-microsoft-anon-tag', '-fms-extensions'])
+    ebpf_map = ebpf.get_table('mnt_ns_set')
     print('[+] eBPF map is setup...')
-    return bpf_map
+    return (ebpf, ebpf_map)
 
 def add_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry, image: str, container_id: str, pod_name: str, node_name: str, active_policies):
     # get the PID from the local container runtime and the respective namespace id
@@ -133,9 +132,9 @@ if __name__ == '__main__':
     policy_process.start()
 
     # eBPF probing
-    ebpf_map = recreate_ebpf_map(MNTNSMAP)
+    ebpf, ebpf_map = create_ebpf_map()
     containers_registry = BpfTrackedContainersRegistry()
-    BpfProbe(containers_registry, MNTNSMAP)
+    BpfProbe(containers_registry, ebpf)
 
     # k8s container events
     containers_manager(ebpf_map, active_policies, containers_registry)

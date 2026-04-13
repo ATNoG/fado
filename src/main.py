@@ -1,8 +1,7 @@
 from argparse import ArgumentParser, RawDescriptionHelpFormatter, BooleanOptionalAction
 from models import BpfProbe, BpfTrackedContainersRegistry, Scenario, HMM
-from .trace_docker import recreate_ebpf_map, containers_manager
+from .trace_docker import create_ebpf_map, containers_manager
 from .simulation import simulate
-from config import MNTNSMAP
 
 def main():
     parser = ArgumentParser(description='Trace container syscalls', formatter_class=RawDescriptionHelpFormatter)
@@ -25,10 +24,6 @@ def main():
 
     parser.add_argument('-e', '--exploit', default=False, action=BooleanOptionalAction,
         help='Trigger exploit during simulation (default: disabled).'
-    )
-
-    parser.add_argument('--mntnsmap', type=str, default=MNTNSMAP,
-        help=f'BPF map path for mount namespaces (default: {MNTNSMAP}).'
     )
 
     parser.add_argument('-d', '--duration', type=int, default=0,
@@ -58,9 +53,9 @@ def main():
     args = parser.parse_args()
     if args.scenario != None:
         print('Simulating...')
-        ebpf_map = recreate_ebpf_map(args.mntnsmap)
+        ebpf, ebpf_map = create_ebpf_map()
         containers_registry = BpfTrackedContainersRegistry()
-        BpfProbe(containers_registry, args.mntnsmap)
+        BpfProbe(containers_registry, ebpf)
         queue = containers_manager(ebpf_map, containers_registry, track_scenario=Scenario(args.scenario))
         simulate(args.scenario, queue, args.limit, args.duration, args.exploit, args.window_size, args.filename)
         return
@@ -85,9 +80,9 @@ def main():
 
     # default behavior
     print('Tracing...')
-    ebpf_map = recreate_ebpf_map(args.mntnsmap)
+    ebpf, ebpf_map = create_ebpf_map()
     containers_registry = BpfTrackedContainersRegistry()
-    BpfProbe(containers_registry, args.mntnsmap)
+    BpfProbe(containers_registry, ebpf)
     containers_manager(ebpf_map, containers_registry)
 
 if __name__== '__main__':
