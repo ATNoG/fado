@@ -1,26 +1,20 @@
 from .bpf_tracked_containers_registry import BpfTrackedContainersRegistry
-from bcc.containers import filter_by_containers
 from collections import defaultdict
-from dataclasses import dataclass
 from threading import Thread
 from bcc import BPF
 
 class BpfProbe:
     """Attaches to specific containers for probing"""
 
-    @dataclass
-    class BpfProbeFilter:
-        def __init__(self, mntnsmap: str):
-            self.mntnsmap = mntnsmap
-            self.cgroupmap = None
-
     def __init__(self, container_registry: BpfTrackedContainersRegistry, mntnsmap: str):
-        args = self.BpfProbeFilter(mntnsmap)
-        bpf = filter_by_containers(args) + open('./models/bpf/bpf.program', 'r').read()
+        bpf = open('./models/bpf/bpf.program', 'r').read()
         self.bpf = BPF(text=bpf, cflags=['-Wno-microsoft-anon-tag', '-fms-extensions'])
         self.container_registry = container_registry
         self.thread = Thread(target=self.monitor, daemon=True)
         self.thread.start()
+
+    def bruh(self):
+        return self.bpf.get_table('mnt_ns_set')
 
     def monitor(self):
         tmp_windows = defaultdict(list)
