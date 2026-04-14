@@ -33,12 +33,16 @@ spec:
               drop:
                 - ALL
               add:
+                # allow the bpf syscall
+                # TODO: i think this can be narrowed down
                 - SYS_ADMIN
+
+                # allow for eBPF resource allocation and memory locking (prevent swapping)
                 - SYS_RESOURCE
-                - SYS_PTRACE
-                - SYS_MODULE
-                - DAC_OVERRIDE
                 - IPC_LOCK
+
+                # allow tracing/controlling other processes
+                - SYS_PTRACE
 
           resources:
             requests:
@@ -56,8 +60,6 @@ spec:
               readOnly: true
             - name: container-sock
               mountPath: /run/containerd/containerd.sock
-            - name: sys-fs-bpf
-              mountPath: /sys/fs/bpf
 
       volumes:
         - name: sys-kernel-debug
@@ -69,6 +71,3 @@ spec:
         - name: container-sock
           hostPath:
             path: /run/containerd/containerd.sock
-        - name: sys-fs-bpf
-          hostPath:
-            path: /sys/fs/bpf

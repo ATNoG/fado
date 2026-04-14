@@ -10,8 +10,8 @@ class BpfTrackedContainersRegistry:
         self.lock = Lock()
 
     def add_container(self, namespace_id: int, container: BpfTrackedContainer) -> bool:
-        """Adds a new container with a specific namespace id.  
-        Does nothing if the namespace id is already present."""
+        '''Adds a new container with a specific namespace id.  
+        Does nothing if the namespace id is already present.'''
 
         with self.lock:
             # don't re-add the same container
@@ -23,8 +23,8 @@ class BpfTrackedContainersRegistry:
         return True
 
     def remove_container(self, container_id: str) -> int | None:
-        """Removes a container with a specific container id.  
-        Does nothing if no container with the id is not found."""
+        '''Removes a container with a specific container id.  
+        Does nothing if no container with the id is not found.'''
 
         namespace_id = None
         with self.lock:
@@ -42,8 +42,8 @@ class BpfTrackedContainersRegistry:
         return namespace_id
 
     def get_container_queue(self, namespace_id: int) -> Queue[list[list[int]]] | None:
-        """Get the Queue for the container with the specific namespace id.  
-        Does nothing if the namespace id does not exist."""
+        '''Get the Queue for the container with the specific namespace id.  
+        Does nothing if the namespace id does not exist.'''
 
         with self.lock:
             if namespace_id in self.containers:
@@ -52,8 +52,8 @@ class BpfTrackedContainersRegistry:
         return None
 
     def get_container_window_size(self, namespace_id: int) -> int | None:
-        """Get the window size for the container with the specific namespace id.  
-        Does nothing if the namespace id does not exist."""
+        '''Get the window size for the container with the specific namespace id.  
+        Does nothing if the namespace id does not exist.'''
 
         with self.lock:
             if namespace_id in self.containers:
@@ -62,9 +62,10 @@ class BpfTrackedContainersRegistry:
         return None
 
     def get_pod_container_id(self, pod_name) -> str | None:
-        """Get the container id running in a specific pod if it exists.  
+        '''Get the container id running in a specific pod if it exists.  
         Gets the first one if multiple containers exist per pod.
-        """
+        '''
+
         with self.lock:
             for c in self.containers.values():
                 if c.pod_name == pod_name:
@@ -73,5 +74,5 @@ class BpfTrackedContainersRegistry:
         return None
 
     def tracks_pod(self, pod_name: str) -> bool:
-        """Returns a boolean indicating if a specific pod is tracked by this registry."""
+        '''Returns a boolean indicating if a specific pod is tracked by this registry.'''
         return self.get_pod_container_id(pod_name) != None

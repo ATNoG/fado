@@ -1,6 +1,7 @@
 from .base_simulation import BaseSimulation
 from enum import Enum
 
+# TODO: maybe this could just be a str enum?? instead of using a property for the image name
 class Scenario(Enum):
     YAML_LOAD        = 0
     SENTIMENTANALYER = 1
