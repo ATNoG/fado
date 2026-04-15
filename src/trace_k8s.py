@@ -1,9 +1,9 @@
-from models import BpfTrackedContainer, BpfProbe, BpfTrackedContainersRegistry, PolicyRule
+from models import BpfTrackedContainer, BpfProbe, BpfTrackedContainersRegistry, PolicyRule, Alert, ActionType
 from multiprocessing import Process, Queue, set_start_method, Manager
 from config import MODELS, IMAGE_MODEL_MAPPINGS, MAX_QUEUE_SIZE
 from kubernetes.client import CoreV1Api, CustomObjectsApi
+import socket, os, subprocess, json, logging
 from kubernetes import config as K8sconfig
-import socket, os, subprocess, json
 from kubernetes.watch import Watch
 from bcc.table import HashTable
 from bcc import BPF
@@ -15,14 +15,14 @@ def create_ebpf_map() -> tuple[BPF, HashTable]:
     print('[+] eBPF map is setup...')
     return (ebpf, ebpf_map)
 
-def add_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry, image: str, container_id: str, pod_name: str, node_name: str, active_policies):
+def add_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry, image: str, container_id: str, pod_name: str, node_name: str, alerts: Queue[Alert]):
     # get the PID from the local container runtime and the respective namespace id
     result = subprocess.run(['crictl', 'inspect', container_id], capture_output=True, text=True, check=True)
     container_pid = json.loads(result.stdout)['info']['pid']
 
     ns_id = os.stat(f'/proc/{container_pid}/ns/mnt').st_ino
     model_path = MODELS / (IMAGE_MODEL_MAPPINGS[image] + '.pkl')
-    bpf_tracked_container = BpfTrackedContainer(image, container_id, model_path, pod_name, node_name, Queue(maxsize=MAX_QUEUE_SIZE), active_policies)
+    bpf_tracked_container = BpfTrackedContainer(image, container_id, model_path, pod_name, node_name, Queue(maxsize=MAX_QUEUE_SIZE), alerts)
     if not containers_registry.add_container(ns_id, bpf_tracked_container):
         return
 
@@ -46,7 +46,7 @@ def load_k8s_config():
     except K8sconfig.ConfigException:
         K8sconfig.load_kube_config(config_file='/etc/kubernetes/kubelet.conf')
 
-def containers_manager(ebpf_map, active_policies, containers_registry: BpfTrackedContainersRegistry):
+def containers_manager(ebpf_map, containers_registry: BpfTrackedContainersRegistry, alerts: Queue[Alert]):
     load_k8s_config()
     node_name = socket.gethostname()
     node_selector = f'spec.nodeName={node_name}'
@@ -93,7 +93,7 @@ def containers_manager(ebpf_map, active_policies, containers_registry: BpfTracke
                         remove_container(ebpf_map, containers_registry, old_cid)
                         print('    ⮡ Container restart')
 
-                    add_container(ebpf_map, containers_registry, container_image, current_cid, pod_name, node_name, active_policies)
+                    add_container(ebpf_map, containers_registry, container_image, current_cid, pod_name, node_name, alerts)
 
                 break
 
@@ -123,13 +123,46 @@ def watch_policies(active_policies):
                 del active_policies[policy_name]
                 print(f'[Policy Engine] Removed: {policy_name}')
 
+# TODO: what about alerts for containers that were already killed (but not removed yet) or that do not exist?
+def alert_manager(alerts: Queue[Alert], active_policies):
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
+
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    handler.setFormatter(formatter)
+    if not logger.hasHandlers():
+        logger.addHandler(handler)
+
+    while True:
+        alert = alerts.get(block=True, timeout=None)
+        for action in alert.evaluate_alert(active_policies):
+            match action:
+                case ActionType.NOTHING:
+                    pass
+                case ActionType.LOG:
+                    logger.warning(f'SECURITY ALERT | '
+                        f'Node: {alert.node_name} | '
+                        f'Pod: {alert.pod_name} | '
+                        f'Container ID: {alert.container_id} | '
+                        f'Alert severity: {alert.alert_severity} | '
+                        f'Window: {alert.window}'
+                    )
+                case ActionType.KILL:
+                    subprocess.run(['crictl', 'stop', '--timeout', '0', alert.container_id], capture_output=True, text=True, check=True)
+                case _:
+                    raise RuntimeError('Invalid ActionType value.')
+
 if __name__ == '__main__':
     set_start_method('spawn')
 
     # policies watcher
     active_policies = Manager().dict()
-    policy_process = Process(target=watch_policies, args=(active_policies,), daemon=True)
-    policy_process.start()
+    Process(target=watch_policies, args=(active_policies,), daemon=True).start()
+
+    # alert manager
+    alerts = Queue(maxsize=MAX_QUEUE_SIZE)
+    Process(target=alert_manager, args=(alerts, active_policies)).start()
 
     # eBPF probing
     ebpf, ebpf_map = create_ebpf_map()
@@ -137,4 +170,4 @@ if __name__ == '__main__':
     BpfProbe(containers_registry, ebpf)
 
     # k8s container events
-    containers_manager(ebpf_map, active_policies, containers_registry)
+    containers_manager(ebpf_map, containers_registry, alerts)

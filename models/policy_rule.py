@@ -1,4 +1,4 @@
-from .alert_severity import AlertSeverity
+from .alert import AlertSeverity
 from pydantic import BaseModel
 from enum import Enum
 

@@ -66,16 +66,14 @@ def main():
             return
 
         model = HMM(args.filename, n_components=args.states, n_iter=args.iterations)
+        if args.train:
+            print('Training...')
+            model.train(args.train)
 
-    if args.train:
-        print('Training...')
-        model.train(args.train)
-        if not args.test:
-            return
+        if args.test:
+            print('Testing...')
+            model.test(args.test)
 
-    if args.test:
-        print('Testing...')
-        model.test(args.test)
         return
 
     # default behavior
