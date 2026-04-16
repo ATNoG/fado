@@ -153,7 +153,7 @@ def watch_image_model_mappings(active_image_model_mappings):
                     value = f.read().strip()
                     new_mappings[filename] = value
 
-        if new_mappings != active_image_model_mappings:
+        if new_mappings != dict(active_image_model_mappings):
             # add/update mappings
             for key, value in new_mappings.items():
                 active_image_model_mappings[key] = value
