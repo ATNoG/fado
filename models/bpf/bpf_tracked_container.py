@@ -64,7 +64,6 @@ class BpfTrackedContainer:
                     results.append(1 if score < self.threshold or isneginf(score) else 0)
 
                 if sum(results) > len(results) * TOLERANCE:
-                    # print('[-] Anomaly detected')
                     # TODO: always high alert severity?? this should probably be dependent on the syscall sequence
                     if self.alerts != None:
                         try:
@@ -74,5 +73,7 @@ class BpfTrackedContainer:
                             self.alerts.put(alert, block=False, timeout=None)
                         except Full:
                             pass
+                    else:
+                        print('[-] Anomaly detected')
 
             windows.clear()
