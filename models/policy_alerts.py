@@ -1,10 +1,22 @@
-from .policy_rule import ActionType
+from pydantic import BaseModel
 from enum import Enum
 
 class AlertSeverity(str, Enum):
-    Low = 'low'
+    Low    = 'low'
     Medium = 'medium'
-    High = 'high'
+    High   = 'high'
+
+class ActionType(str, Enum):
+    NOTHING = 'nothing'
+    LOG     = 'log'
+    KILL    = 'kill'
+
+class MatchCriteria(BaseModel):
+    alert_severity: AlertSeverity
+
+class PolicyRule(BaseModel):
+    match: MatchCriteria
+    actions: list[ActionType]
 
 class Alert:
     def __init__(self, node_name: str, pod_name: str, container_id: str, alert_severity: AlertSeverity, window: list[int]):

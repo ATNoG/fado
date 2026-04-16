@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from models import BpfTrackedContainer, BpfProbe, BpfTrackedContainersRegistry, PolicyRule, Alert, ActionType
 from multiprocessing import Process, Queue, set_start_method, Manager
 from config import MODELS, IMAGE_MODEL_MAPPINGS, MAX_QUEUE_SIZE

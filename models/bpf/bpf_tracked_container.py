@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from multiprocessing import Process, Event, Queue
+from ..policy_alerts import AlertSeverity, Alert
 from numpy import isneginf, array as np_array
-from ..alert import AlertSeverity
 from collections import deque
 from config import TOLERANCE
 from pathlib import Path
-from models import Alert
 from pickle import load
 
 class BpfTrackedContainer:
@@ -64,7 +63,7 @@ class BpfTrackedContainer:
                     results.append(1 if score < self.threshold or isneginf(score) else 0)
 
                 if sum(results) > len(results) * TOLERANCE:
-                    print('[-] Anomaly detected')
+                    # print('[-] Anomaly detected')
                     # TODO: always high alert severity?? this should probably be dependent on the syscall sequence
                     if self.alerts != None:
                         try:
