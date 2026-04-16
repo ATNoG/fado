@@ -54,7 +54,7 @@ def containers_manager(ebpf_map, containers_registry: BpfTrackedContainersRegist
         container_id = event['Actor']['ID']
 
         if container_action == 'start':
-            if not track_scenario and f'{container_image}:v1' in IMAGE_MODEL_MAPPINGS:
+            if not track_scenario and container_image in IMAGE_MODEL_MAPPINGS:
                 add_container(ebpf_map, containers_registry, container_image, container_id, 'docker_pod', 'docker_node')
 
             elif track_scenario and container_image == track_scenario.image_name:
