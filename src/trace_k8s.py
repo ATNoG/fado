@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from models import BpfTrackedContainer, BpfProbe, BpfTrackedContainersRegistry, PolicyRule, Alert, ActionType
 from multiprocessing import Process, Queue, set_start_method, Manager
-from config import MODELS, IMAGE_MODEL_MAPPINGS, MAX_QUEUE_SIZE
+from config import MODELS, MAX_QUEUE_SIZE, IMAGE_MODEL_MAPPINGS
 from kubernetes.client import CoreV1Api, CustomObjectsApi
 import socket, os, subprocess, json, logging
 from kubernetes import config as K8sconfig
 from kubernetes.watch import Watch
 from bcc.table import HashTable
+from time import sleep
 from bcc import BPF
 
 def create_ebpf_map() -> tuple[BPF, HashTable]:
@@ -17,13 +18,13 @@ def create_ebpf_map() -> tuple[BPF, HashTable]:
     print('[+] eBPF map is setup...')
     return (ebpf, ebpf_map)
 
-def add_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry, image: str, container_id: str, pod_name: str, node_name: str, alerts: Queue[Alert]):
+def add_container(ebpf_map, model_name: str, containers_registry: BpfTrackedContainersRegistry, image: str, container_id: str, pod_name: str, node_name: str, alerts: Queue[Alert]):
     # get the PID from the local container runtime and the respective namespace id
     result = subprocess.run(['crictl', 'inspect', container_id], capture_output=True, text=True, check=True)
     container_pid = json.loads(result.stdout)['info']['pid']
 
     ns_id = os.stat(f'/proc/{container_pid}/ns/mnt').st_ino
-    model_path = MODELS / (IMAGE_MODEL_MAPPINGS[image] + '.pkl')
+    model_path = MODELS / f'{model_name}.pkl'
     bpf_tracked_container = BpfTrackedContainer(image, container_id, model_path, pod_name, node_name, Queue(maxsize=MAX_QUEUE_SIZE), alerts)
     if not containers_registry.add_container(ns_id, bpf_tracked_container):
         return
@@ -48,10 +49,11 @@ def load_k8s_config():
     except K8sconfig.ConfigException:
         K8sconfig.load_kube_config(config_file='/etc/kubernetes/kubelet.conf')
 
-def containers_manager(ebpf_map, containers_registry: BpfTrackedContainersRegistry, alerts: Queue[Alert]):
+def containers_manager(ebpf_map, active_image_model_mappings, containers_registry: BpfTrackedContainersRegistry, alerts: Queue[Alert]):
     load_k8s_config()
     node_name = socket.gethostname()
     node_selector = f'spec.nodeName={node_name}'
+
     for event in Watch().stream(CoreV1Api().list_namespaced_pod, namespace='default', field_selector=node_selector):
         # the other event types are not usefull
         if type(event) != dict:
@@ -62,8 +64,9 @@ def containers_manager(ebpf_map, containers_registry: BpfTrackedContainersRegist
             continue
 
         # example: nginxdemos/hello:plain-text
-        container_image = pod.metadata.annotations['client.knative.dev/user-image'].split('/')[1]
-        if container_image not in IMAGE_MODEL_MAPPINGS:
+        container_image = pod.metadata.annotations['client.knative.dev/user-image'].split('/')[1].split(':')[0]
+        model_name = active_image_model_mappings.get(container_image)
+        if not model_name:
             continue
 
         if not pod.status.container_statuses:
@@ -95,7 +98,7 @@ def containers_manager(ebpf_map, containers_registry: BpfTrackedContainersRegist
                         remove_container(ebpf_map, containers_registry, old_cid)
                         print('    ⮡ Container restart')
 
-                    add_container(ebpf_map, containers_registry, container_image, current_cid, pod_name, node_name, alerts)
+                    add_container(ebpf_map, model_name, containers_registry, container_image, current_cid, pod_name, node_name, alerts)
 
                 break
 
@@ -125,6 +128,47 @@ def watch_policies(active_policies):
                 del active_policies[policy_name]
                 print(f'[Policy Engine] Removed: {policy_name}')
 
+def watch_image_model_mappings(active_image_model_mappings):
+    config_map_dir = '/etc/security-agent/mappings'
+
+    # might happen when running outside of the DaemonSet
+    if not os.path.exists(config_map_dir):
+        print('[+] Loading model mappings from local config...')
+        for key, value in IMAGE_MODEL_MAPPINGS.items():
+            active_image_model_mappings[key] = value
+
+        return
+
+    print('[+] Starting Image-Model Mappings Engine...')
+    while True:
+        # get the newest mappings
+        new_mappings = {}
+        for filename in os.listdir(config_map_dir):
+            if filename.startswith('.'):
+                continue
+
+            file_path = os.path.join(config_map_dir, filename)
+            if os.path.isfile(file_path):
+                with open(file_path, 'r') as f:
+                    value = f.read().strip()
+                    new_mappings[filename] = value
+
+        if new_mappings != active_image_model_mappings:
+            # add/update mappings
+            for key, value in new_mappings.items():
+                active_image_model_mappings[key] = value
+
+            # remove old mappings
+            for key in list(active_image_model_mappings.keys()):
+                if key not in new_mappings:
+                    del active_image_model_mappings[key]
+
+            print(f'[Image-Model Mappings Engine] Loaded/Updated {len(new_mappings)} mappings')
+
+        # check for changes every 30 seconds
+        sleep(30)
+
+# TODO: this should send alert to a SIEM
 # TODO: what about alerts for containers that were already killed (but not removed yet) or that do not exist?
 def alert_manager(alerts: Queue[Alert], active_policies):
     logger = logging.getLogger(__name__)
@@ -166,10 +210,14 @@ if __name__ == '__main__':
     alerts = Queue(maxsize=MAX_QUEUE_SIZE)
     Process(target=alert_manager, args=(alerts, active_policies)).start()
 
+    # image model watcher
+    active_image_model_mappings = Manager().dict()
+    Process(target=watch_image_model_mappings, args=(active_image_model_mappings,)).start()
+
     # eBPF probing
     ebpf, ebpf_map = create_ebpf_map()
     containers_registry = BpfTrackedContainersRegistry()
     BpfProbe(containers_registry, ebpf)
 
     # k8s container events
-    containers_manager(ebpf_map, containers_registry, alerts)
+    containers_manager(ebpf_map, active_image_model_mappings, containers_registry, alerts)

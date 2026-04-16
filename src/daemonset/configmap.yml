@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-agent-config
+  namespace: default
+data:
+  yaml_load: YamlLoadWithStartup_5s_w2_10p
+  sentiment_analyzer: SentimentAnalyzerWithStartup_10s_w2_10p
+  log4shell: Log4ShellWithStartup_5s_w2_10p

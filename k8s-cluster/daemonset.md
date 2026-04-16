@@ -31,6 +31,11 @@ Apply the RBAC rules (on the controller):
 kubectl apply -f src/daemonset/rbac.yml
 ```
 
+Create the config map (on the controller):
+```bash
+kubectl apply -f src/daemonset/configmap.yml
+```
+
 Create the DaemonSet (on the controller):
 ```bash
 kubectl apply -f src/daemonset/daemonset.yml

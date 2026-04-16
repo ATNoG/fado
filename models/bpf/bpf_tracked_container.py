@@ -4,6 +4,7 @@ from multiprocessing import Process, Event, Queue
 from ..policy_alerts import AlertSeverity, Alert
 from numpy import isneginf, array as np_array
 from collections import deque
+from queue import Full, Empty
 from config import TOLERANCE
 from pathlib import Path
 from pickle import load
@@ -46,7 +47,7 @@ class BpfTrackedContainer:
         while not self.process_event.is_set():
             try:
                 windows += self.queue.get(block=True, timeout=0.1)
-            except:
+            except Empty:
                 continue
 
             while not self.queue.empty():
@@ -71,7 +72,7 @@ class BpfTrackedContainer:
                             # we cannot hold this process back if the alert manager decides to hang or is just too slow
                             alert = Alert(self.node_name, self.pod_name, self.container_id, AlertSeverity.High, window)
                             self.alerts.put(alert, block=False, timeout=None)
-                        except:
+                        except Full:
                             pass
 
             windows.clear()

@@ -1,6 +1,7 @@
 from .bpf_tracked_containers_registry import BpfTrackedContainersRegistry
 from collections import defaultdict
 from threading import Thread
+from queue import Full
 from bcc import BPF
 
 class BpfProbe:
@@ -33,7 +34,7 @@ class BpfProbe:
                     # TODO: should this have a timeout just to avoid unnecessary data losses?
                     # we cannot hold the probe back if some consumer thread/process decides to hang or is just too slow
                     queue.put([tmp_windows[event.tid][:]], block=False, timeout=None)
-                except:
+                except Full:
                     pass
 
         # register callback

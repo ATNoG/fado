@@ -21,8 +21,8 @@ def add_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry, i
     container_pid = client.containers.get(container_id).attrs['State']['Pid']
     ns_id = os.stat(f'/proc/{container_pid}/ns/mnt').st_ino
 
-    model_path = MODELS / (IMAGE_MODEL_MAPPINGS[f'{image}:v1'] + '.pkl')
-    bpf_tracked_container = BpfTrackedContainer(image, container_id, model_path, pod_name, node_name, Queue(maxsize=MAX_QUEUE_SIZE), None, run_process=run_process, apply_policies=False)
+    model_path = MODELS / f'{IMAGE_MODEL_MAPPINGS[image]}.pkl'
+    bpf_tracked_container = BpfTrackedContainer(image, container_id, model_path, pod_name, node_name, Queue(maxsize=MAX_QUEUE_SIZE), None, run_process=run_process)
     if not containers_registry.add_container(ns_id, bpf_tracked_container):
         return None
 

@@ -60,6 +60,9 @@ spec:
               readOnly: true
             - name: container-sock
               mountPath: /run/containerd/containerd.sock
+            - name: config
+              mountPath: /etc/security-agent/mappings
+              readOnly: true
 
       volumes:
         - name: sys-kernel-debug
@@ -71,3 +74,6 @@ spec:
         - name: container-sock
           hostPath:
             path: /run/containerd/containerd.sock
+        - name: config
+          configMap:
+            name: security-agent-config
