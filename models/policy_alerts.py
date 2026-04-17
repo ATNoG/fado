@@ -18,13 +18,11 @@ class PolicyRule(BaseModel):
     match: MatchCriteria
     actions: list[ActionType]
 
-class Alert:
-    def __init__(self, node_name: str, pod_name: str, container_id: str, alert_severity: AlertSeverity, window: list[int]):
-        self.node_name = node_name
-        self.pod_name = pod_name
-        self.container_id = container_id
-        self.alert_severity = alert_severity
-        self.window = window
+class Alert(BaseModel):
+    image: str
+    container_id: str
+    alert_severity: AlertSeverity
+    window: list[int]
 
     def evaluate_alert(self, active_policies) -> list[ActionType]:
         # must be a list to ensure action order

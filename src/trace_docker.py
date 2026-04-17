@@ -17,12 +17,12 @@ def create_ebpf_map() -> tuple[BPF, HashTable]:
     print('[+] eBPF map is setup...')
     return (ebpf, ebpf_map)
 
-def add_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry, image: str, container_id: str, pod_name: str, node_name: str, run_process: bool=True) -> int | None:
+def add_container(ebpf_map, containers_registry: BpfTrackedContainersRegistry, image: str, pod_name: str, container_id: str, run_process: bool=True) -> int | None:
     container_pid = client.containers.get(container_id).attrs['State']['Pid']
     ns_id = os.stat(f'/proc/{container_pid}/ns/mnt').st_ino
 
     model_path = MODELS / f'{IMAGE_MODEL_MAPPINGS[image]}.pkl'
-    bpf_tracked_container = BpfTrackedContainer(image, container_id, model_path, pod_name, node_name, Queue(maxsize=MAX_QUEUE_SIZE), None, run_process=run_process)
+    bpf_tracked_container = BpfTrackedContainer(image, pod_name, container_id, model_path, Queue(maxsize=MAX_QUEUE_SIZE), None, run_process=run_process)
     if not containers_registry.add_container(ns_id, bpf_tracked_container):
         return None
 
@@ -55,10 +55,10 @@ def containers_manager(ebpf_map, containers_registry: BpfTrackedContainersRegist
 
         if container_action == 'start':
             if not track_scenario and container_image in IMAGE_MODEL_MAPPINGS:
-                add_container(ebpf_map, containers_registry, container_image, container_id, 'docker_pod', 'docker_node')
+                add_container(ebpf_map, containers_registry, container_image, 'docker_pod', container_id)
 
             elif track_scenario and container_image == track_scenario.image_name:
-                ns_id = add_container(ebpf_map, containers_registry, container_image, container_id, 'docker_pod', 'docker_node', run_process=False)
+                ns_id = add_container(ebpf_map, containers_registry, container_image, 'docker_pod', container_id, run_process=False)
                 assert ns_id != None
 
                 queue = containers_registry.get_container_queue(ns_id)

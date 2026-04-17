@@ -12,11 +12,10 @@ from pickle import load
 class BpfTrackedContainer:
     '''Represents a container being tracked by eBPF'''
 
-    def __init__(self, image: str, container_id: str, model_path: Path, pod_name: str, node_name: str, queue: Queue[list[list[int]]], alerts: Queue[Alert] | None, run_process: bool=True):
+    def __init__(self, image: str, pod_name: str, container_id: str, model_path: Path, queue: Queue[list[list[int]]], alerts: Queue[Alert] | None, run_process: bool=True):
         self.image = image
-        self.container_id = container_id
         self.pod_name = pod_name
-        self.node_name = node_name
+        self.container_id = container_id
         self.queue = queue
         self.run_process = run_process
         self.alerts = alerts
@@ -69,7 +68,7 @@ class BpfTrackedContainer:
                         try:
                             # TODO: should this have a timeout just to avoid unnecessary alert losses?
                             # we cannot hold this process back if the alert manager decides to hang or is just too slow
-                            alert = Alert(self.node_name, self.pod_name, self.container_id, AlertSeverity.High, window)
+                            alert = Alert(image=self.image, container_id=self.container_id, alert_severity=AlertSeverity.High, window=window)
                             self.alerts.put(alert, block=False, timeout=None)
                         except Full:
                             pass

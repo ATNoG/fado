@@ -19,14 +19,14 @@ def create_ebpf_map() -> tuple[BPF, HashTable]:
     print('[+] eBPF map is setup...')
     return (ebpf, ebpf_map)
 
-def add_container(ebpf_map, model_name: str, containers_registry: BpfTrackedContainersRegistry, image: str, container_id: str, pod_name: str, node_name: str, alerts: Queue[Alert]):
+def add_container(ebpf_map, model_name: str, containers_registry: BpfTrackedContainersRegistry, image: str, pod_name: str, container_id: str, alerts: Queue[Alert]):
     # get the PID from the local container runtime and the respective namespace id
     result = subprocess.run(['crictl', 'inspect', container_id], capture_output=True, text=True, check=True)
     container_pid = json.loads(result.stdout)['info']['pid']
 
     ns_id = os.stat(f'/proc/{container_pid}/ns/mnt').st_ino
     model_path = MODELS / f'{model_name}.pkl'
-    bpf_tracked_container = BpfTrackedContainer(image, container_id, model_path, pod_name, node_name, Queue(maxsize=MAX_QUEUE_SIZE), alerts)
+    bpf_tracked_container = BpfTrackedContainer(image, pod_name, container_id, model_path, Queue(maxsize=MAX_QUEUE_SIZE), alerts)
     if not containers_registry.add_container(ns_id, bpf_tracked_container):
         return
 
@@ -99,7 +99,7 @@ def containers_manager(ebpf_map, active_image_model_mappings, containers_registr
                         remove_container(ebpf_map, containers_registry, old_cid)
                         print('    ⮡ Container restart')
 
-                    add_container(ebpf_map, model_name, containers_registry, container_image, current_cid, pod_name, node_name, alerts)
+                    add_container(ebpf_map, model_name, containers_registry, container_image, pod_name, current_cid, alerts)
 
                 break
 
@@ -187,21 +187,7 @@ def alert_manager(alerts: Queue[Alert], active_policies):
                 case ActionType.NOTHING:
                     pass
                 case ActionType.LOG:
-                    alert_payload = {
-                        'container_id': alert.container_id,
-                        'alert_severity': alert.alert_severity,
-                        'window': alert.window,
-                        # 'image': image,
-                    }
-
-                    logger.info(json.dumps(alert_payload))
-                    # logger.warning(f'SECURITY ALERT | '
-                    #     f'Node: {alert.node_name} | '
-                    #     f'Pod: {alert.pod_name} | '
-                    #     f'Container ID: {alert.container_id} | '
-                    #     f'Alert severity: {alert.alert_severity} | '
-                    #     f'Window: {alert.window}'
-                    # )
+                    logger.info(alert.model_dump_json())
                 case ActionType.KILL:
                     subprocess.run(['crictl', 'stop', '--timeout', '0', alert.container_id], capture_output=True, text=True, check=True)
                 case _:
