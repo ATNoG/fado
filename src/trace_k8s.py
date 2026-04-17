@@ -9,6 +9,7 @@ from kubernetes import config as K8sconfig
 from kubernetes.watch import Watch
 from bcc.table import HashTable
 from time import sleep
+from sys import stdout
 from bcc import BPF
 
 def create_ebpf_map() -> tuple[BPF, HashTable]:
@@ -168,14 +169,13 @@ def watch_image_model_mappings(active_image_model_mappings):
         # check for changes every 30 seconds
         sleep(30)
 
-# TODO: this should send alert to a SIEM
 # TODO: what about alerts for containers that were already killed (but not removed yet) or that do not exist?
 def alert_manager(alerts: Queue[Alert], active_policies):
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger('security-agent')
     logger.setLevel(logging.INFO)
 
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    handler = logging.StreamHandler(stdout)
+    formatter = logging.Formatter('[SECURITY ALERT] %(message)s')
     handler.setFormatter(formatter)
     if not logger.hasHandlers():
         logger.addHandler(handler)
@@ -187,13 +187,21 @@ def alert_manager(alerts: Queue[Alert], active_policies):
                 case ActionType.NOTHING:
                     pass
                 case ActionType.LOG:
-                    logger.warning(f'SECURITY ALERT | '
-                        f'Node: {alert.node_name} | '
-                        f'Pod: {alert.pod_name} | '
-                        f'Container ID: {alert.container_id} | '
-                        f'Alert severity: {alert.alert_severity} | '
-                        f'Window: {alert.window}'
-                    )
+                    alert_payload = {
+                        'container_id': alert.container_id,
+                        'alert_severity': alert.alert_severity,
+                        'window': alert.window,
+                        # 'image': image,
+                    }
+
+                    logger.info(json.dumps(alert_payload))
+                    # logger.warning(f'SECURITY ALERT | '
+                    #     f'Node: {alert.node_name} | '
+                    #     f'Pod: {alert.pod_name} | '
+                    #     f'Container ID: {alert.container_id} | '
+                    #     f'Alert severity: {alert.alert_severity} | '
+                    #     f'Window: {alert.window}'
+                    # )
                 case ActionType.KILL:
                     subprocess.run(['crictl', 'stop', '--timeout', '0', alert.container_id], capture_output=True, text=True, check=True)
                 case _:
