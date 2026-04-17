@@ -67,3 +67,5 @@ ignore/
 *.log
 *.pdf
 eval/
+
+wazuh-credentials
