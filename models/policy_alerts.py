@@ -22,6 +22,7 @@ class Alert(BaseModel):
     image: str
     container_id: str
     alert_severity: AlertSeverity
+    pod_name: str
     window: list[int]
 
     def evaluate_alert(self, active_policies) -> list[ActionType]:

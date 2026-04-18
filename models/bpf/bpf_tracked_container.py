@@ -68,7 +68,7 @@ class BpfTrackedContainer:
                         try:
                             # TODO: should this have a timeout just to avoid unnecessary alert losses?
                             # we cannot hold this process back if the alert manager decides to hang or is just too slow
-                            alert = Alert(image=self.image, container_id=self.container_id, alert_severity=AlertSeverity.High, window=window)
+                            alert = Alert(image=self.image, container_id=self.container_id, alert_severity=AlertSeverity.High, pod_name=self.pod_name, window=window)
                             self.alerts.put(alert, block=False, timeout=None)
                         except Full:
                             pass

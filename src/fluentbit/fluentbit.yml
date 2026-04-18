@@ -49,32 +49,51 @@ data:
         Flush         1
         Log_Level     info
         Daemon        off
-        Parsers_File  parsers.conf
+        Parsers_File  parsers.conf          
+        Parsers_File  custom_parsers.conf
 
     [INPUT]
         Name              tail
         Path              /var/log/containers/*security-agent*.log
         Parser            cri
-        Tag               ebpf.alerts
+        Tag               kube.*
         Mem_Buf_Limit     5MB
         Skip_Long_Lines   On
 
     [FILTER]
+        Name              grep
+        Match             kube.*
+        Regex             message ^\[SECURITY ALERT\]
+
+    [FILTER]
+        Name              parser
+        Match             kube.*
+        Key_Name          message
+        Parser            magic_tag_parser
+        Reserve_Data      True
+
+    [FILTER]
         Name              kubernetes
-        Match             ebpf.alerts
+        Match             kube.*
         Kube_URL          https://kubernetes.default.svc:443
         Kube_CA_File      /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
         Kube_Token_File   /var/run/secrets/kubernetes.io/serviceaccount/token
-        Kube_Tag_Prefix   ebpf.alerts.var.log.containers.
+        Merge_Log         On
+        Merge_Log_Key     log
 
     [OUTPUT]
-        Name              syslog
-        Match             ebpf.alerts
+        Name              tcp
+        Match             kube.*
         Host              10.255.41.108
         Port              514
-        Mode              tcp
-        Syslog_Format     rfc5424
-        Retry_Limit       5
+        Format            json_lines
+
+  custom_parsers.conf: |
+    [PARSER]
+        Name            magic_tag_parser
+        Format          regex
+        Regex           ^\[SECURITY ALERT\]\s+(?<log>\{.*\})$
+        Decode_Field_As json log
 
 ---
 
@@ -94,9 +113,6 @@ spec:
         app: fluent-bit
     spec:
       serviceAccountName: fluent-bit
-      tolerations:
-        - operator: Exists
-          effect: NoSchedule
       containers:
       - name: fluent-bit
         image: cr.fluentbit.io/fluent/fluent-bit:2.2.2
@@ -107,7 +123,11 @@ spec:
           mountPath: /var/lib/docker/containers
           readOnly: true
         - name: fluent-bit-config
-          mountPath: /fluent-bit/etc/
+          mountPath: /fluent-bit/etc/fluent-bit.conf
+          subPath: fluent-bit.conf
+        - name: fluent-bit-config
+          mountPath: /fluent-bit/etc/custom_parsers.conf
+          subPath: custom_parsers.conf
       volumes:
       - name: varlog
         hostPath:

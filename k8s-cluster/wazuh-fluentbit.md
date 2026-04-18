@@ -5,15 +5,14 @@ curl -sO https://packages.wazuh.com/4.14/wazuh-install.sh && sudo bash ./wazuh-i
 ```
 
 # Configure Wazuh
-To enable syslog support, go to `/var/ossec/etc/ossec.conf` and add the following configuration inside the `<ossec_config>` tags:
+To enable syslog support, go to `/var/ossec/etc/ossec.conf` and scroll down until you see the existing `<remote>` block (it will say <connection>secure</connection> and port 1514), and add the following configuration inside the `<ossec_config>` tags:
 ```
 <remote>
     <connection>syslog</connection>
     <port>514</port>
-    <protocol>udp</protocol>
-    <allowed-ips>10.255.41.0/24</allowed-ips>
-    <local_ip>0.0.0.0</local_ip>
-</remote>
+    <protocol>tcp</protocol>
+    <allowed-ips>any</allowed-ips>
+  </remote>
 ```
 
 Then, restart the wazuh manager:
