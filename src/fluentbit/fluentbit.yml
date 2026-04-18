@@ -49,7 +49,7 @@ data:
         Flush         1
         Log_Level     info
         Daemon        off
-        Parsers_File  parsers.conf          
+        Parsers_File  parsers.conf
         Parsers_File  custom_parsers.conf
 
     [INPUT]
