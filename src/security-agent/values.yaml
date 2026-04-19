@@ -1,0 +1,25 @@
+image: "dev.local/security-agent:v1"
+agentsPerNode: 1
+resources:
+  requests:
+    cpu: 500m
+    memory: 1024Mi
+  limits:
+    cpu: 1000m
+    memory: 2048Mi
+securityContext:
+  privileged: false
+  capabilities:
+    drop:
+      - ALL
+    add:
+      # allow the bpf syscall
+      # TODO: i think this can be narrowed down (BPF and PERFMON)
+      - SYS_ADMIN
+
+      # allow for eBPF resource allocation and memory locking (prevent swapping)
+      - SYS_RESOURCE
+      - IPC_LOCK
+
+      # allow tracing/controlling other processes
+      - SYS_PTRACE

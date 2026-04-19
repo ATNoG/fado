@@ -1,3 +1,12 @@
+# Install Helm
+To deploy the DaemonSet, you will need Helm (on the controller):
+```bash
+wget https://get.helm.sh/helm-v4.1.4-linux-amd64.tar.gz
+tar -xzf helm-v4.1.4-linux-amd64.tar.gz
+sudo mv linux-amd64/helm /usr/local/bin/
+rm -rf linux-amd64/ helm-v4.1.4-linux-amd64.tar.gz
+```
+
 # Build and deploy the DaemonSet image
 On any machine with Docker installed and from the root of this project:
 ```bash
@@ -36,7 +45,12 @@ Create the config map (on the controller):
 kubectl apply -f src/daemonset/configmap.yml
 ```
 
-Create the DaemonSet (on the controller):
+<!-- Create the DaemonSet (on the controller):
 ```bash
 kubectl apply -f src/daemonset/daemonset.yml
+``` -->
+
+# Deploy using Helm
+```bash
+helm install ebpf-security-agent src/security-agent
 ```

@@ -1,0 +1,68 @@
+{{- $totalAgents := int .Values.agentsPerNode }}
+{{- range $i := until $totalAgents }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: security-agent-{{ $i }}
+  namespace: default
+  labels:
+    app: security-agent-{{ $i }}
+spec:
+  selector:
+    matchLabels:
+      app: security-agent-{{ $i }}
+  template:
+    metadata:
+      labels:
+        app: security-agent-{{ $i }}
+    spec:
+      serviceAccountName: security-agent-sa
+      hostPID: true
+      hostNetwork: true
+
+      containers:
+        - name: agent
+          image: {{ $.Values.image }}
+          imagePullPolicy: Never
+
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: AGENT_ID
+              value: "{{ $i }}"
+            - name: TOTAL_AGENTS
+              value: "{{ $totalAgents }}"
+
+          securityContext:
+            {{- toYaml $.Values.securityContext | nindent 12 }}
+
+          resources:
+            {{- toYaml $.Values.resources | nindent 12 }}
+
+          volumeMounts:
+            - name: sys-kernel-debug
+              mountPath: /sys/kernel/debug
+            - name: lib-modules
+              mountPath: /lib/modules
+              readOnly: true
+            - name: container-sock
+              mountPath: /run/containerd/containerd.sock
+            - name: config
+              mountPath: /etc/security-agent/mappings
+              readOnly: true
+
+      volumes:
+        - name: sys-kernel-debug
+          hostPath:
+            path: /sys/kernel/debug
+        - name: lib-modules
+          hostPath:
+            path: /lib/modules
+        - name: container-sock
+          hostPath:
+            path: /run/containerd/containerd.sock
+        - name: config
+          configMap:
+            name: security-agent-config
+---
+{{- end }}

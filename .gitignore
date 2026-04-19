@@ -69,3 +69,7 @@ ignore/
 eval/
 
 wazuh-credentials
+
+!src/security-agent/templates/daemonset.yaml
+!src/security-agent/Chart.yaml
+!src/security-agent/values.yaml
