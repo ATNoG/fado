@@ -63,11 +63,14 @@ class BpfTrackedContainer:
                     results.append(1 if score < self.threshold or isneginf(score) else 0)
 
                 if sum(results) > len(results) * TOLERANCE:
-                    # TODO: always high alert severity?? this should probably be dependent on the syscall sequence
+                    # TODO: always high alert severity?
+                    #  - this should probably be dependent on the syscall window/sequence to allow for more specific classification if, for example:
+                    #    - a socket is opened (high alert)
+                    #    - creates a log file (probably lower severity)
                     if self.alerts != None:
                         try:
-                            # TODO: should this have a timeout just to avoid unnecessary alert losses?
                             # we cannot hold this process back if the alert manager decides to hang or is just too slow
+                            # TODO: should this have a timeout just to avoid unnecessary alert losses?
                             alert = Alert(image=self.image, container_id=self.container_id, alert_severity=AlertSeverity.High, pod_name=self.pod_name, window=window)
                             self.alerts.put(alert, block=False, timeout=None)
                         except Full:
