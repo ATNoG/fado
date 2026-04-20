@@ -8,6 +8,7 @@ import socket, os, subprocess, json, logging
 from kubernetes import config as K8sconfig
 from kubernetes.watch import Watch
 from bcc.table import HashTable
+from hashlib import md5
 from time import sleep
 from sys import stdout
 from bcc import BPF
@@ -55,6 +56,9 @@ def containers_manager(ebpf_map, active_image_model_mappings, containers_registr
     node_name = socket.gethostname()
     node_selector = f'spec.nodeName={node_name}'
 
+    agent_id = int(os.environ.get('AGENT_ID', default='0'), 10)
+    total_agents = int(os.environ.get('TOTAL_AGENTS', default='1'), 10)
+
     for event in Watch().stream(CoreV1Api().list_namespaced_pod, namespace='default', field_selector=node_selector):
         # the other event types are not usefull
         if type(event) != dict:
@@ -99,7 +103,10 @@ def containers_manager(ebpf_map, active_image_model_mappings, containers_registr
                         remove_container(ebpf_map, containers_registry, old_cid)
                         print('    ⮡ Container restart')
 
-                    add_container(ebpf_map, model_name, containers_registry, container_image, pod_name, current_cid, alerts)
+                    # check if the new container belongs to this agent
+                    hash_int = int(md5(current_cid.encode('utf-8')).hexdigest(), 16)
+                    if hash_int % total_agents == agent_id:
+                        add_container(ebpf_map, model_name, containers_registry, container_image, pod_name, current_cid, alerts)
 
                 break
 

@@ -17,7 +17,9 @@ data/stats/
 k8s-cluster/
 scenarios/
 src/daemonset/
+src/fluentbit/
 src/policies/
+src/security-agent/
 tools/
 data/eval/
 data/figs/
@@ -26,3 +28,4 @@ data/figs/
 CITATION.cff
 LICENSE
 README.md
+wazuh-credentials
