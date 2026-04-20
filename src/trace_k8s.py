@@ -59,6 +59,7 @@ def containers_manager(ebpf_map, active_image_model_mappings, containers_registr
     agent_id = int(os.environ.get('AGENT_ID', default='0'), 10)
     total_agents = int(os.environ.get('TOTAL_AGENTS', default='1'), 10)
 
+    # TODO: this needs logic to avoid "too old resource version" problems/exceptions (among others)
     for event in Watch().stream(CoreV1Api().list_namespaced_pod, namespace='default', field_selector=node_selector):
         # the other event types are not usefull
         if type(event) != dict:
@@ -113,28 +114,34 @@ def containers_manager(ebpf_map, active_image_model_mappings, containers_registr
 def watch_policies(active_policies):
     print('[+] Starting Policy Engine...')
     load_k8s_config()
-    stream = Watch().stream(CustomObjectsApi().list_cluster_custom_object, group='security.ua.com', version='v1', plural='securitypolicies')
-    for event in stream:
-        # the other event types are not usefull
-        if type(event) != dict:
-            continue
 
-        event_type = event['type']
-        obj = event['object']
-        policy_name = obj['metadata']['name']
+    while True:
+        try:
+            stream = Watch().stream(CustomObjectsApi().list_cluster_custom_object, group='security.ua.com', version='v1', plural='securitypolicies')
+            for event in stream:
+                # the other event types are not usefull
+                if type(event) != dict:
+                    continue
 
-        if event_type in ['ADDED', 'MODIFIED']:
-            try:
-                rule = PolicyRule(**obj['spec'])
-                active_policies[policy_name] = rule
-                print(f'[Policy Engine] Loaded/Updated: {policy_name}')
-            except Exception as e:
-                print(f'[Policy Engine] Parse Error "{policy_name}": {e}')
+                event_type = event['type']
+                obj = event['object']
+                policy_name = obj['metadata']['name']
 
-        elif event_type == 'DELETED':
-            if policy_name in active_policies:
-                del active_policies[policy_name]
-                print(f'[Policy Engine] Removed: {policy_name}')
+                if event_type in ['ADDED', 'MODIFIED']:
+                    try:
+                        rule = PolicyRule(**obj['spec'])
+                        active_policies[policy_name] = rule
+                        print(f'[Policy Engine] Loaded/Updated: {policy_name}')
+                    except Exception as e:
+                        print(f'[Policy Engine] Parse Error "{policy_name}": {e}')
+
+                elif event_type == 'DELETED':
+                    if policy_name in active_policies:
+                        del active_policies[policy_name]
+                        print(f'[Policy Engine] Removed: {policy_name}')
+        except:
+            # this might happen when resources get too old, there is a problem with the k8s API, networking issues, ...
+            sleep(5)
 
 def watch_image_model_mappings(active_image_model_mappings):
     config_map_dir = '/etc/security-agent/mappings'
@@ -196,7 +203,7 @@ def alert_manager(alerts: Queue[Alert], active_policies):
                 case ActionType.LOG:
                     logger.info(alert.model_dump_json())
                 case ActionType.KILL:
-                    subprocess.run(['crictl', 'stop', '--timeout', '0', alert.container_id], capture_output=True, text=True)
+                    subprocess.run(['crictl', 'stop', '--timeout', '0', alert.container_id])
                 case _:
                     raise RuntimeError('Invalid ActionType value.')
 
