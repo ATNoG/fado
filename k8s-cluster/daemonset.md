@@ -45,11 +45,6 @@ Create the config map (on the controller):
 kubectl apply -f src/daemonset/configmap.yml
 ```
 
-<!-- Create the DaemonSet (on the controller):
-```bash
-kubectl apply -f src/daemonset/daemonset.yml
-``` -->
-
 # Deploy using Helm
 ```bash
 helm install ebpf-security-agent src/security-agent

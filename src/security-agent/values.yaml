@@ -1,5 +1,5 @@
 image: "dev.local/security-agent:v1"
-agentsPerNode: 1
+agentsPerNode: 2
 resources:
   requests:
     cpu: 500m

@@ -196,7 +196,7 @@ def alert_manager(alerts: Queue[Alert], active_policies):
                 case ActionType.LOG:
                     logger.info(alert.model_dump_json())
                 case ActionType.KILL:
-                    subprocess.run(['crictl', 'stop', '--timeout', '0', alert.container_id], capture_output=True, text=True, check=True)
+                    subprocess.run(['crictl', 'stop', '--timeout', '0', alert.container_id], capture_output=True, text=True)
                 case _:
                     raise RuntimeError('Invalid ActionType value.')
 
