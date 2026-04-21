@@ -130,8 +130,9 @@ def watch_policies(active_policies):
                 if event_type in ['ADDED', 'MODIFIED']:
                     try:
                         rule = PolicyRule(**obj['spec'])
-                        active_policies[policy_name] = rule
-                        print(f'[Policy Engine] Loaded/Updated: {policy_name}')
+                        if rule not in active_policies:
+                            active_policies[policy_name] = rule
+                            print(f'[Policy Engine] Loaded/Updated: {policy_name}')
                     except Exception as e:
                         print(f'[Policy Engine] Parse Error "{policy_name}": {e}')
 
