@@ -15,6 +15,7 @@ from bcc import BPF
 
 def create_ebpf_map() -> tuple[BPF, HashTable]:
     text = open('./src/bpf/bpf.program', 'r').read()
+    # TODO: what if this fails to compile? should this try multiple times before giving up?
     ebpf = BPF(text=text, cflags=['-Wno-microsoft-anon-tag', '-fms-extensions'])
     ebpf_map = ebpf.get_table('mnt_ns_set')
     print('[+] eBPF map is setup...')
