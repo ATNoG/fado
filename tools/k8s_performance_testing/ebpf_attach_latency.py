@@ -1,5 +1,6 @@
-import subprocess, json, re, threading, requests, csv, os
+import subprocess, json, re, requests, csv, os
 from datetime import datetime
+from threading import Thread
 from time import sleep
 
 CSV_FILENAME = 'data/ebpf_attach_latency.csv'
@@ -28,7 +29,7 @@ def parse_nano_timestamp(ts_string):
     return datetime.fromisoformat(ts_string)
 
 def run_benchmark():
-    threading.Thread(target=trigger_cold_start, daemon=True).start()
+    Thread(target=trigger_cold_start, daemon=True).start()
 
     # poll k8s until the new pod appears
     print(f"[+] Waiting for new '{KSVC_NAME}' pod to spin up...")
@@ -39,7 +40,7 @@ def run_benchmark():
 
     print(f'[+] Found new Pod: {pod_name}')
 
-    # wait for the application container to start and get its container id
+    # get the container id
     print('[+] Waiting for container ID...')
     container_id = ''
     while not container_id:
@@ -133,7 +134,7 @@ def run_benchmark():
         'latency_ms'  : round(latency_ms, 2)
     }
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     # initialize the csv file
     if os.path.exists(CSV_FILENAME):
         f = open(CSV_FILENAME, mode='a', newline='')
@@ -142,6 +143,7 @@ if __name__ == "__main__":
         f = open(CSV_FILENAME, mode='w', newline='')
         writer = csv.writer(f)
         writer.writerow(['Container ID', 'Start Time', 'Attach Time', 'Latency (ms)'])
+        f.flush()
 
     for i in range(1, NUM_RUNS + 1):
         if i != 1:
