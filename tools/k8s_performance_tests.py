@@ -1,12 +1,15 @@
-import subprocess, json, re, threading, requests
+import subprocess, json, re, threading, requests, csv, os
 from datetime import datetime
 from time import sleep
 
-# KNATIVE_URL = 'http://sentiment-analyzer.default.10.255.41.115.sslip.io/'
-# KSVC_NAME   = 'sentiment-analyzer'
+CSV_FILENAME = 'data/ebpf_attach_latency.csv'
+NUM_RUNS = 25
 
-KNATIVE_URL = 'http://yaml-load.default.10.255.41.115.sslip.io/'
-KSVC_NAME   = 'yaml-load'
+KNATIVE_URL = 'http://sentiment-analyzer.default.10.255.41.115.sslip.io/'
+KSVC_NAME   = 'sentiment-analyzer'
+
+# KNATIVE_URL = 'http://yaml-load.default.10.255.41.115.sslip.io/'
+# KSVC_NAME   = 'yaml-load'
 
 def run_cmd(cmd):
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
@@ -14,7 +17,10 @@ def run_cmd(cmd):
 
 def trigger_cold_start():
     print(f'[+] Firing HTTP request to {KNATIVE_URL} to trigger cold start...')
-    requests.get(KNATIVE_URL, timeout=15)
+    try:
+        requests.get(KNATIVE_URL, timeout=15)
+    except:
+        pass
 
 def parse_nano_timestamp(ts_string):
     ts_string = re.sub(r'(\.\d{6})\d+Z', r'\1Z', ts_string)
@@ -107,18 +113,50 @@ def run_benchmark():
     print(f'[+] Container Started At: {runtime_start_time}')
     print(f'[+] Agent Claimed At:     {agent_attach_time}')
 
-    # calculate the window of vulnerability
-    if runtime_start_time and agent_attach_time:
-        delta = agent_attach_time - runtime_start_time
-        milliseconds = delta.total_seconds() * 1000
+    latency_ms = (agent_attach_time - runtime_start_time).total_seconds() * 1000
+    print(f'[+] Attach Latency: {latency_ms:.2f} ms')
 
-        print('\n' + '=' * 50)
-        print('BENCHMARK RESULTS')
-        print('=' * 50)
-        print(f'Container Start: {runtime_start_time.strftime('%H:%M:%S.%f')[:-3]}')
-        print(f'Agent Attach:    {agent_attach_time.strftime('%H:%M:%S.%f')[:-3]}')
-        print(f'Latency Window:  {milliseconds:.2f} ms')
-        print('=' * 50)
+    print(f'[+] Waiting for Knative to naturally scale-to-zero...')
+    while True:
+        pod_check = run_cmd(f'kubectl get pods -l serving.knative.dev/service={KSVC_NAME} --no-headers')
+        active_pods = [line for line in pod_check.split('\n') if line.strip() and 'Terminating' not in line]
+        if not active_pods:
+            print(f'[+] Knative successfully scaled to zero')
+            break
+        else:
+            sleep(2)
 
-if __name__ == '__main__':
-    run_benchmark()
+    return {
+        'container_id': container_id,
+        'start_time'  : runtime_start_time.strftime('%H:%M:%S.%f')[:-3],
+        'attach_time' : agent_attach_time.strftime('%H:%M:%S.%f')[:-3],
+        'latency_ms'  : round(latency_ms, 2)
+    }
+
+if __name__ == "__main__":
+    # initialize the csv file
+    if os.path.exists(CSV_FILENAME):
+        f = open(CSV_FILENAME, mode='a', newline='')
+        writer = csv.writer(f)
+    else:
+        f = open(CSV_FILENAME, mode='w', newline='')
+        writer = csv.writer(f)
+        writer.writerow(['Container ID', 'Start Time', 'Attach Time', 'Latency (ms)'])
+
+    for i in range(1, NUM_RUNS + 1):
+        if i != 1:
+            print()
+
+        print(f'{'='*50}\nSTARTING RUN {i}/{NUM_RUNS}\n{'='*50}')
+        data = run_benchmark()
+        writer.writerow([data['container_id'], data['start_time'], data['attach_time'], data['latency_ms']])
+        f.flush()
+
+        if i < NUM_RUNS:
+            print('[+] Cooldown (3s) before next run...')
+            sleep(3)
+
+    f.close()
+    print('\n' + '=' * 50)
+    print(f"BENCHMARK COMPLETE. Data saved to {CSV_FILENAME}")
+    print('=' * 50)
