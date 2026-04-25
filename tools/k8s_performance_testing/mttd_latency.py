@@ -1,4 +1,4 @@
-import subprocess, time, re, csv, os, requests
+import subprocess, time, re, csv, os, requests, json
 from datetime import datetime, timezone
 from threading import Thread
 from time import sleep
@@ -37,6 +37,37 @@ def fire_exploit():
 
     subprocess.run(EXPLOIT_CMD, cwd=EXPLOIT_CWD, capture_output=True)
     return datetime.now(timezone.utc)
+
+def get_wazuh_alert_time(container_id, exploit_time):
+    print(f'[*] Polling Wazuh Manager via SSH for Rule 100002...')
+
+    wazuh_alert_time = None
+    timeout = time.time() + TIMEOUT
+    while not wazuh_alert_time and time.time() < timeout:
+        raw_alerts = run_cmd(f"ssh ubuntu@10.255.41.108 'sudo grep {container_id} /var/ossec/logs/alerts/alerts.json'")
+        if raw_alerts:
+            for line in raw_alerts.strip().split('\n'):
+                try:
+                    alert_json = json.loads(line)
+
+                    # make sure we get the timestamp from the correct rule
+                    if str(alert_json.get('rule', {}).get('id')) == '100002':
+                        raw_wazuh_time = alert_json.get('timestamp')
+                        if raw_wazuh_time:
+                            parsed_wazuh_time = parse_nano_timestamp(raw_wazuh_time)
+
+                            # ensure the alert fired after our exploit trigger
+                            if parsed_wazuh_time > exploit_time:
+                                wazuh_alert_time = parsed_wazuh_time
+                                break
+
+                except json.JSONDecodeError:
+                    continue
+
+        if not wazuh_alert_time:
+            time.sleep(1)
+
+    return wazuh_alert_time
 
 def run_mttd_test():
     Thread(target=trigger_cold_start, daemon=True).start()
@@ -119,19 +150,29 @@ def run_mttd_test():
         run_cmd(f'kubectl delete pod {pod_name} --wait=false')
         return None
 
+    wazuh_alert_time = get_wazuh_alert_time(container_id, exploit_time)
+    if not wazuh_alert_time:
+        print('[!] Wazuh alert not found! Is the alerts system working?')
+        run_cmd(f'kubectl delete pod {pod_name} --wait=false')
+        return None
+
     latency_ms = (agent_alert_time - exploit_time).total_seconds() * 1000
+    wazuh_latency_ms = (wazuh_alert_time - exploit_time).total_seconds() * 1000
     print('\n' + '=' * 50)
     print(f'Exploit Fired:    {exploit_time.strftime('%H:%M:%S.%f')[:-3]}')
     print(f'Agent Detection:  {agent_alert_time.strftime('%H:%M:%S.%f')[:-3]}')
     print(f'MTTD Latency:     {latency_ms:.2f} ms')
+    print(f"Wazuh SIEM Alert: {wazuh_alert_time.strftime('%H:%M:%S.%f')[:-3]} ({wazuh_latency_ms:.2f} ms)")
     print('=' * 50)
 
     run_cmd(f'kubectl delete pod {pod_name} --wait=false')
     return {
-        'container_id': container_id,
-        'exploit_time': exploit_time.strftime('%H:%M:%S.%f')[:-3],
-        'alert_time'  : agent_alert_time.strftime('%H:%M:%S.%f')[:-3],
-        'latency_ms'  : round(latency_ms, 2)
+        'container_id'    : container_id,
+        'exploit_time'    : exploit_time.strftime('%H:%M:%S.%f')[:-3],
+        'alert_time'      : agent_alert_time.strftime('%H:%M:%S.%f')[:-3],
+        'latency_ms'      : round(latency_ms, 2),
+        'wazuh_time'      : wazuh_alert_time.strftime('%H:%M:%S.%f')[:-3],
+        'wazuh_latency_ms': round(wazuh_latency_ms, 2)
     }
 
 if __name__ == '__main__':
@@ -141,7 +182,7 @@ if __name__ == '__main__':
     else:
         f = open(CSV_FILENAME, mode='w', newline='')
         writer = csv.writer(f)
-        writer.writerow(['Container ID', 'Exploit Time', 'Alert Time', 'Latency (ms)'])
+        writer.writerow(['Container ID', 'Exploit Time', 'Alert Time', 'Latency (ms)', 'Wazuh Time', 'Wazuh latency (ms)'])
         f.flush()
 
     for i in range(1, NUM_RUNS + 1):
@@ -151,7 +192,7 @@ if __name__ == '__main__':
         print(f"{'='*50}\nSTARTING MTTD RUN {i}/{NUM_RUNS}\n{'='*50}")
         data = run_mttd_test()
         if data:
-            writer.writerow([data['container_id'], data['exploit_time'], data['alert_time'], data['latency_ms']])
+            writer.writerow([data['container_id'], data['exploit_time'], data['alert_time'], data['latency_ms'], data['wazuh_time'], data['wazuh_latency_ms']])
             f.flush()
 
         if i < NUM_RUNS:
