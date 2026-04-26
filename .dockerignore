@@ -13,7 +13,10 @@ venv/
 
 # random folders
 data/logs/
+data/perf_tests/
 data/stats/
+data/eval/
+data/figs/
 k8s-cluster/
 scenarios/
 src/daemonset/
@@ -21,8 +24,6 @@ src/fluentbit/
 src/policies/
 src/security-agent/
 tools/
-data/eval/
-data/figs/
 
 # random files
 CITATION.cff
