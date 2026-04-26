@@ -3,7 +3,7 @@ from datetime import datetime
 from threading import Thread
 from time import sleep
 
-CSV_FILENAME = 'data/ebpf_attach_latency.csv'
+CSV_FILENAME = 'data/perf_tests/ebpf_attach_latency.csv'
 NUM_RUNS = 25
 
 KNATIVE_URL = 'http://sentiment-analyzer.default.10.255.41.115.sslip.io/'

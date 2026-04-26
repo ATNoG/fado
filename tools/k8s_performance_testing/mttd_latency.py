@@ -5,7 +5,7 @@ from time import sleep
 
 TIMEOUT = 10
 ALERT_LOG_STRING = '[SECURITY ALERT]'
-CSV_FILENAME = 'data/mttd_latency.csv'
+CSV_FILENAME = 'data/perf_tests/mttd_latency.csv'
 NUM_RUNS = 10
 
 # KNATIVE_URL = 'http://sentiment-analyzer.default.10.255.41.115.sslip.io/'
@@ -34,7 +34,6 @@ def parse_nano_timestamp(ts_string):
 
 def fire_exploit():
     print(f'[+] Firing exploit payload at {KSVC_NAME}...')
-
     subprocess.run(EXPLOIT_CMD, cwd=EXPLOIT_CWD, capture_output=True)
     return datetime.now(timezone.utc)
 
