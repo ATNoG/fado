@@ -60,57 +60,61 @@ def containers_manager(ebpf_map, active_image_model_mappings, containers_registr
     agent_id = int(os.environ.get('AGENT_ID', default='0'), 10)
     total_agents = int(os.environ.get('TOTAL_AGENTS', default='1'), 10)
 
-    # TODO: this needs logic to avoid "too old resource version" problems/exceptions (among others)
-    for event in Watch().stream(CoreV1Api().list_namespaced_pod, namespace='default', field_selector=node_selector):
-        # the other event types are not usefull
-        if type(event) != dict:
-            continue
-
-        pod = event['object']
-        if not pod.metadata.labels or 'serving.knative.dev/revision' not in pod.metadata.labels:
-            continue
-
-        # example: nginxdemos/hello:plain-text
-        container_image = pod.metadata.annotations['client.knative.dev/user-image'].split('/')[1].split(':')[0]
-        model_name = active_image_model_mappings.get(container_image)
-        if not model_name:
-            continue
-
-        if not pod.status.container_statuses:
-            continue
-
-        event_type = event['type']
-        pod_name = pod.metadata.name
-        old_cid = containers_registry.get_pod_container_id(pod_name)
-        if event_type == 'MODIFIED' and pod.metadata.deletion_timestamp is not None:
-            # container got removed/deleted
-            if old_cid != None:
-                remove_container(ebpf_map, containers_registry, old_cid)
-
-            continue
-
-        if event_type in ('ADDED', 'MODIFIED') and pod.status.phase == 'Running' and pod.metadata.deletion_timestamp is None:
-            for container_status in pod.status.container_statuses:
-                if container_status.name != 'user-container' or not container_status.container_id:
+    while True:
+        try:
+            for event in Watch().stream(CoreV1Api().list_namespaced_pod, namespace='default', field_selector=node_selector):
+                # the other event types are not usefull
+                if type(event) != dict:
                     continue
 
-                # ensure that the container is actually up and running
-                if not container_status.state or not container_status.state.running:
+                pod = event['object']
+                if not pod.metadata.labels or 'serving.knative.dev/revision' not in pod.metadata.labels:
                     continue
 
-                current_cid = container_status.container_id.split('://')[-1]
-                if old_cid == None or old_cid != current_cid:
-                    # the container was restarted, we must clean up and re-add the container
+                # example: nginxdemos/hello:plain-text
+                container_image = pod.metadata.annotations['client.knative.dev/user-image'].split('/')[1].split(':')[0]
+                model_name = active_image_model_mappings.get(container_image)
+                if not model_name:
+                    continue
+
+                if not pod.status.container_statuses:
+                    continue
+
+                event_type = event['type']
+                pod_name = pod.metadata.name
+                old_cid = containers_registry.get_pod_container_id(pod_name)
+                if event_type == 'MODIFIED' and pod.metadata.deletion_timestamp is not None:
+                    # container got removed/deleted
                     if old_cid != None:
                         remove_container(ebpf_map, containers_registry, old_cid)
-                        print('    ⮡ Container restart')
 
-                    # check if the new container belongs to this agent
-                    hash_int = int(md5(current_cid.encode('utf-8')).hexdigest(), 16)
-                    if hash_int % total_agents == agent_id:
-                        add_container(ebpf_map, model_name, containers_registry, container_image, pod_name, current_cid, alerts)
+                    continue
 
-                break
+                if event_type in ('ADDED', 'MODIFIED') and pod.status.phase == 'Running' and pod.metadata.deletion_timestamp is None:
+                    for container_status in pod.status.container_statuses:
+                        if container_status.name != 'user-container' or not container_status.container_id:
+                            continue
+
+                        # ensure that the container is actually up and running
+                        if not container_status.state or not container_status.state.running:
+                            continue
+
+                        current_cid = container_status.container_id.split('://')[-1]
+                        if old_cid == None or old_cid != current_cid:
+                            # the container was restarted, we must clean up and re-add the container
+                            if old_cid != None:
+                                remove_container(ebpf_map, containers_registry, old_cid)
+                                print('    ⮡ Container restart')
+
+                            # check if the new container belongs to this agent
+                            hash_int = int(md5(current_cid.encode('utf-8')).hexdigest(), 16)
+                            if hash_int % total_agents == agent_id:
+                                add_container(ebpf_map, model_name, containers_registry, container_image, pod_name, current_cid, alerts)
+
+                        break
+        except:
+            # this might happen when resources get too old, there is a problem with the k8s API, networking issues, ...
+            pass
 
 def watch_policies(active_policies):
     print('[+] Starting Policy Engine...')
