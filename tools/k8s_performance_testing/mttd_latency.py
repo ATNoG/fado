@@ -6,7 +6,7 @@ from time import sleep
 TIMEOUT = 10
 ALERT_LOG_STRING = '[SECURITY ALERT]'
 CSV_FILENAME = 'data/perf_tests/mttd_latency.csv'
-NUM_RUNS = 10
+NUM_RUNS = 11
 
 # KNATIVE_URL = 'http://sentiment-analyzer.default.10.255.41.115.sslip.io/'
 # KSVC_NAME   = 'sentiment-analyzer'

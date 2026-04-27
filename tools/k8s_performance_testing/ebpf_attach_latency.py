@@ -4,13 +4,13 @@ from threading import Thread
 from time import sleep
 
 CSV_FILENAME = 'data/perf_tests/ebpf_attach_latency.csv'
-NUM_RUNS = 25
+NUM_RUNS = 1
 
-KNATIVE_URL = 'http://sentiment-analyzer.default.10.255.41.115.sslip.io/'
-KSVC_NAME   = 'sentiment-analyzer'
+# KNATIVE_URL = 'http://sentiment-analyzer.default.10.255.41.115.sslip.io/'
+# KSVC_NAME   = 'sentiment-analyzer'
 
-# KNATIVE_URL = 'http://yaml-load.default.10.255.41.115.sslip.io/'
-# KSVC_NAME   = 'yaml-load'
+KNATIVE_URL = 'http://yaml-load.default.10.255.41.115.sslip.io/'
+KSVC_NAME   = 'yaml-load'
 
 def run_cmd(cmd):
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
