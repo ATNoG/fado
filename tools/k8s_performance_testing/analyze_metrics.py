@@ -1,5 +1,5 @@
 import csv, statistics, glob
-from numpy import percentile
+# from numpy import percentile
 
 def calculate_stats(data_list, metric_name):
     count = len(data_list)
@@ -12,7 +12,7 @@ def calculate_stats(data_list, metric_name):
     max_val    = max(data_list)
     std_dev    = statistics.stdev(data_list) if count > 1 else 0.0
 
-    p95_val = percentile(data_list, 95) # statistics.quantiles(data_list, n=100, method='inclusive')[94]
+    p95_val = statistics.quantiles(data_list, n=100, method='inclusive')[94] # percentile(data_list, 95)
     p95_str = f"{p95_val:.2f} ms"
 
     report = (
