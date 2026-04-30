@@ -72,28 +72,32 @@ def run_benchmark():
     print(f'[+] Found {len(local_agents)} Security Agents on node {node_name}')
 
     # get the security agent that claimed the container and the 'attach' timestamp
-    claiming_agent, agent_attach_time = None, None
-    while not agent_attach_time or not claiming_agent:
+    claiming_agent, agent_attach_time, event_time = None, None, None
+    while not agent_attach_time or not claiming_agent or not event_time:
         for agent_pod in local_agents:
-            # TODO: what if more than 200 lines have been printed since?? not likely but still...
-            agent_logs = run_cmd(f'kubectl logs {agent_pod} --timestamps --tail=200 | grep {container_id}')
+            # TODO: what if more than 500 lines have been printed since?? not likely but still...
+            agent_logs = run_cmd(f'kubectl logs {agent_pod} --timestamps --tail=500 | grep {container_id}')
 
             # find the first line that mentions the container we want
             for line in agent_logs.split('\n'):
-                if container_id in line:
-                    # get the timestamp use regex
-                    match = re.search(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z)", line)
+                if '[+] Container created with image: ' in line and ' with alert time of: ' in line and container_id in line:
+                    regex_pattern = r"^(\S+).*with alert time of: (\d{2}:\d{2}:\d{2}\.\d{3})"
+                    match = re.search(regex_pattern, line)
+
                     if match:
                         agent_attach_time = parse_nano_timestamp(match.group(1))
+                        event_time = f"{agent_attach_time.strftime('%Y-%m-%d')}T{match.group(2)}Z"
+                        event_time = datetime.fromisoformat(event_time.replace('Z', '+00:00'))
                         claiming_agent = agent_pod
-                        print(f'[+] Container claimed by: {agent_pod}')
                         break
 
-            if agent_attach_time and claiming_agent:
+            if agent_attach_time and claiming_agent and event_time:
                 break
 
-        if not agent_attach_time or not claiming_agent:
+        if not agent_attach_time or not claiming_agent or not event_time:
             sleep(0.5)
+
+    print(f'[+] Container claimed by: {claiming_agent}')
 
     # get the container start up timestamp
     runtime_start_time = None
@@ -112,10 +116,12 @@ def run_benchmark():
             sleep(0.5)
 
     print(f'[+] Container Started At: {runtime_start_time}')
+    print(f'[+] Container Event At:   {event_time}')
     print(f'[+] Agent Claimed At:     {agent_attach_time}')
 
-    latency_ms = (agent_attach_time - runtime_start_time).total_seconds() * 1000
-    print(f'[+] Attach Latency: {latency_ms:.2f} ms')
+    attach_latency_ms = (agent_attach_time - runtime_start_time).total_seconds() * 1000
+    event_latency_ms = (event_time - runtime_start_time).total_seconds() * 1000
+    print(f'[+] Attach Latency: {attach_latency_ms:.2f} ms')
 
     print(f'[+] Waiting for Knative to naturally scale-to-zero...')
     while True:
@@ -128,10 +134,12 @@ def run_benchmark():
             sleep(2)
 
     return {
-        'container_id': container_id,
-        'start_time'  : runtime_start_time.strftime('%H:%M:%S.%f')[:-3],
-        'attach_time' : agent_attach_time.strftime('%H:%M:%S.%f')[:-3],
-        'latency_ms'  : round(latency_ms, 2)
+        'container_id'     : container_id,
+        'start_time'       : runtime_start_time.strftime('%H:%M:%S.%f')[:-3],
+        'event_time'       : event_time.strftime('%H:%M:%S.%f')[:-3],
+        'attach_time'      : agent_attach_time.strftime('%H:%M:%S.%f')[:-3],
+        'event_latency_ms' : round(event_latency_ms, 2),
+        'attach_latency_ms': round(attach_latency_ms, 2)
     }
 
 if __name__ == '__main__':
@@ -142,7 +150,7 @@ if __name__ == '__main__':
     else:
         f = open(CSV_FILENAME, mode='w', newline='')
         writer = csv.writer(f)
-        writer.writerow(['Container ID', 'Start Time', 'Attach Time', 'Latency (ms)'])
+        writer.writerow(['Container ID', 'Start Time', 'Event Time', 'Attach Time', 'Event Latency (ms)', 'Attach Latency (ms)'])
         f.flush()
 
     for i in range(1, NUM_RUNS + 1):
@@ -151,7 +159,7 @@ if __name__ == '__main__':
 
         print(f'{'='*50}\nSTARTING RUN {i}/{NUM_RUNS}\n{'='*50}')
         data = run_benchmark()
-        writer.writerow([data['container_id'], data['start_time'], data['attach_time'], data['latency_ms']])
+        writer.writerow([data['container_id'], data['start_time'], data['event_time'], data['attach_time'], data['event_latency_ms'], data['attach_latency_ms']])
         f.flush()
 
         if i < NUM_RUNS:

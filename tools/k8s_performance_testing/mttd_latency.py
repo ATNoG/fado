@@ -125,7 +125,7 @@ def run_mttd_test():
     timeout = time.time() + TIMEOUT
     while not agent_alert_time and time.time() < timeout:
         for agent_pod in local_agents:
-            agent_logs = run_cmd(f'kubectl logs {agent_pod} --timestamps --tail=200 | grep {container_id}')
+            agent_logs = run_cmd(f'kubectl logs {agent_pod} --timestamps --tail=500 | grep {container_id}')
 
             for line in agent_logs.split('\n'):
                 if container_id in line and ALERT_LOG_STRING in line:
