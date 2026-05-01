@@ -6,11 +6,11 @@ from time import sleep
 CSV_FILENAME = 'data/perf_tests/ebpf_attach_latency.csv'
 NUM_RUNS = 1
 
-# KNATIVE_URL = 'http://sentiment-analyzer.default.10.255.41.115.sslip.io/'
-# KSVC_NAME   = 'sentiment-analyzer'
+KNATIVE_URL = 'http://sentiment-analyzer.default.10.255.41.115.sslip.io/'
+KSVC_NAME   = 'sentiment-analyzer'
 
-KNATIVE_URL = 'http://yaml-load.default.10.255.41.115.sslip.io/'
-KSVC_NAME   = 'yaml-load'
+# KNATIVE_URL = 'http://yaml-load.default.10.255.41.115.sslip.io/'
+# KSVC_NAME   = 'yaml-load'
 
 def run_cmd(cmd):
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
@@ -121,6 +121,7 @@ def run_benchmark():
 
     attach_latency_ms = (agent_attach_time - runtime_start_time).total_seconds() * 1000
     event_latency_ms = (event_time - runtime_start_time).total_seconds() * 1000
+    print(f'[+] Event Latency:  {event_latency_ms:.2f} ms')
     print(f'[+] Attach Latency: {attach_latency_ms:.2f} ms')
 
     print(f'[+] Waiting for Knative to naturally scale-to-zero...')
