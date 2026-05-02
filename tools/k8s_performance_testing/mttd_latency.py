@@ -6,7 +6,7 @@ from time import sleep
 TIMEOUT = 10
 ALERT_LOG_STRING = '[SECURITY ALERT]'
 CSV_FILENAME = 'data/perf_tests/mttd_latency.csv'
-NUM_RUNS = 11
+NUM_RUNS = 1
 
 # KNATIVE_URL = 'http://sentiment-analyzer.default.10.255.41.115.sslip.io/'
 # KSVC_NAME   = 'sentiment-analyzer'
@@ -119,11 +119,11 @@ def run_mttd_test():
 
     exploit_time = fire_exploit()
     print('[+] Searching Agent logs for the detection alert...')
-    agent_alert_time = None
+    agent_alert_time, ml_alert_time = None, None
 
     # timeout just in case the ML model misses it
     timeout = time.time() + TIMEOUT
-    while not agent_alert_time and time.time() < timeout:
+    while (not agent_alert_time or not ml_alert_time) and time.time() < timeout:
         for agent_pod in local_agents:
             agent_logs = run_cmd(f'kubectl logs {agent_pod} --timestamps --tail=500 | grep {container_id}')
 
@@ -136,15 +136,18 @@ def run_mttd_test():
                         # ensure that we don't accidentally grab an old alert
                         if found_time > exploit_time:
                             agent_alert_time = found_time
+                            ml_alert_time = json.loads(line.split('[SECURITY ALERT]')[1])['alert_time']
+                            ml_alert_time = f"{agent_alert_time.strftime('%Y-%m-%d')}T{ml_alert_time}Z"
+                            ml_alert_time = datetime.fromisoformat(ml_alert_time.replace('Z', '+00:00'))
                             break
 
-            if agent_alert_time:
+            if agent_alert_time and ml_alert_time:
                 break
 
-        if not agent_alert_time:
+        if not agent_alert_time or not ml_alert_time:
             time.sleep(0.1)
 
-    if not agent_alert_time:
+    if not agent_alert_time or not ml_alert_time:
         print('[!] Detection failed or timed out! Did the model catch it?')
         run_cmd(f'kubectl delete pod {pod_name} --wait=false')
         return None
@@ -155,23 +158,32 @@ def run_mttd_test():
         run_cmd(f'kubectl delete pod {pod_name} --wait=false')
         return None
 
-    latency_ms = (agent_alert_time - exploit_time).total_seconds() * 1000
+    ml_latency_ms    = (ml_alert_time    - exploit_time).total_seconds() * 1000
+    agent_latency_ms = (agent_alert_time - exploit_time).total_seconds() * 1000
     wazuh_latency_ms = (wazuh_alert_time - exploit_time).total_seconds() * 1000
+
+    if not (ml_latency_ms > 0 and agent_latency_ms > ml_latency_ms and wazuh_latency_ms > agent_latency_ms):
+        print('[!] Detection got impossible latencies. Something went wrong!')
+        run_cmd(f'kubectl delete pod {pod_name} --wait=false')
+        return None
+
     print('\n' + '=' * 50)
     print(f'Exploit Fired:    {exploit_time.strftime('%H:%M:%S.%f')[:-3]}')
-    print(f'Agent Detection:  {agent_alert_time.strftime('%H:%M:%S.%f')[:-3]}')
-    print(f'MTTD Latency:     {latency_ms:.2f} ms')
+    print(f'ML Alert:         {ml_alert_time.strftime('%H:%M:%S.%f')[:-3]} ({ml_latency_ms:.2f} ms)')
+    print(f'Agent Alert:      {agent_alert_time.strftime('%H:%M:%S.%f')[:-3]} ({agent_latency_ms:.2f} ms)')
     print(f"Wazuh SIEM Alert: {wazuh_alert_time.strftime('%H:%M:%S.%f')[:-3]} ({wazuh_latency_ms:.2f} ms)")
     print('=' * 50)
 
     run_cmd(f'kubectl delete pod {pod_name} --wait=false')
     return {
-        'container_id'    : container_id,
-        'exploit_time'    : exploit_time.strftime('%H:%M:%S.%f')[:-3],
-        'alert_time'      : agent_alert_time.strftime('%H:%M:%S.%f')[:-3],
-        'latency_ms'      : round(latency_ms, 2),
-        'wazuh_time'      : wazuh_alert_time.strftime('%H:%M:%S.%f')[:-3],
-        'wazuh_latency_ms': round(wazuh_latency_ms, 2)
+        'container_id'     : container_id,
+        'exploit_time'     : exploit_time.strftime('%H:%M:%S.%f')[:-3],
+        'ml_alert_time'    : ml_alert_time.strftime('%H:%M:%S.%f')[:-3],
+        'agent_alert_time' : agent_alert_time.strftime('%H:%M:%S.%f')[:-3],
+        'wazuh_time'       : wazuh_alert_time.strftime('%H:%M:%S.%f')[:-3],
+        'ml_latency_ms'    : round(ml_latency_ms, 2),
+        'agent_latency_ms' : round(agent_latency_ms, 2),
+        'wazuh_latency_ms' : round(wazuh_latency_ms, 2)
     }
 
 if __name__ == '__main__':
@@ -181,7 +193,7 @@ if __name__ == '__main__':
     else:
         f = open(CSV_FILENAME, mode='w', newline='')
         writer = csv.writer(f)
-        writer.writerow(['Container ID', 'Exploit Time', 'Alert Time', 'Latency (ms)', 'Wazuh Time', 'Wazuh latency (ms)'])
+        writer.writerow(['Container ID', 'Exploit Time', 'ML Alert Time', 'Agent Alert Time', 'Wazuh Time', 'ML Latency (ms)', 'Agent Latency (ms)', 'Wazuh Latency (ms)'])
         f.flush()
 
     for i in range(1, NUM_RUNS + 1):
@@ -191,7 +203,7 @@ if __name__ == '__main__':
         print(f"{'='*50}\nSTARTING MTTD RUN {i}/{NUM_RUNS}\n{'='*50}")
         data = run_mttd_test()
         if data:
-            writer.writerow([data['container_id'], data['exploit_time'], data['alert_time'], data['latency_ms'], data['wazuh_time'], data['wazuh_latency_ms']])
+            writer.writerow([data['container_id'], data['exploit_time'], data['ml_alert_time'], data['agent_alert_time'], data['wazuh_time'], data['ml_latency_ms'], data['agent_latency_ms'], data['wazuh_latency_ms']])
             f.flush()
 
         if i < NUM_RUNS:
