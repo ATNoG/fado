@@ -12,6 +12,10 @@ def calculate_stats(data_list, metric_name):
     max_val    = max(data_list)
     std_dev    = statistics.stdev(data_list) if count > 1 else 0.0
 
+    quartiles = statistics.quantiles(data_list, n=4, method='inclusive')
+    q1_val = quartiles[0]
+    q3_val = quartiles[2]
+
     p95_val = statistics.quantiles(data_list, n=100, method='inclusive')[94] # percentile(data_list, 95)
     p95_str = f"{p95_val:.2f} ms"
 
@@ -19,6 +23,8 @@ def calculate_stats(data_list, metric_name):
         f'  Metric: {metric_name} (Based on {count} runs)\n'
         f'  --------------------------------------------------\n'
         f'  Fastest:       {min_val:.2f} ms\n'
+        f'  Lower Q (Q1):  {q1_val:.2f} ms\n'
+        f'  Upper Q (Q3):  {q3_val:.2f} ms\n'
         f'  Slowest:       {max_val:.2f} ms\n'
         f'  Average:       {mean_val:.2f} ms\n'
         f'  Median:        {median_val:.2f} ms\n'
